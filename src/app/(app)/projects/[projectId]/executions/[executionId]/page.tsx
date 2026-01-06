@@ -22,6 +22,39 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
     "Can't Test": 'outline'
 };
 
+const isImage = (url: string) => /\.(jpeg|jpg|gif|png|webp)$/i.test(url);
+const isVideo = (url: string) => /\.(mp4|webm|ogg)$/i.test(url);
+
+const EvidencePreview = ({ link }: { link: string }) => {
+    if (isImage(link)) {
+        return (
+            <Link href={link} target="_blank" rel="noopener noreferrer" className="w-24 h-24 relative block">
+                <Image 
+                    src={link} 
+                    alt="Evidence" 
+                    fill
+                    sizes="96px"
+                    style={{ objectFit: "cover" }}
+                    className="rounded-md hover:opacity-80 transition-opacity"
+                />
+            </Link>
+        );
+    }
+    if (isVideo(link)) {
+        return (
+            <video controls className="w-full max-w-sm rounded-md" src={link} />
+        );
+    }
+    return (
+        <div className="text-sm">
+            <Link href={link} target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:underline">
+                <Paperclip className="mr-2 h-4 w-4" />
+                <span>{link}</span>
+            </Link>
+        </div>
+    );
+};
+
 export default function ExecutionDetailsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
@@ -117,17 +150,9 @@ export default function ExecutionDetailsPage() {
                                         <TableCell>
                                             <div className="flex flex-col gap-2">
                                                 {result.evidenceLinks && result.evidenceLinks.length > 0 && (
-                                                     <div className="flex flex-wrap gap-2">
+                                                     <div className="flex flex-wrap items-start gap-2">
                                                         {result.evidenceLinks.map((link, i) => (
-                                                            <Link key={i} href={link} target="_blank" rel="noopener noreferrer" className="w-24 h-24 relative">
-                                                                <Image 
-                                                                    src={link} 
-                                                                    alt={`Evidence ${i + 1}`} 
-                                                                    fill
-                                                                    objectFit="cover"
-                                                                    className="rounded-md hover:opacity-80 transition-opacity"
-                                                                />
-                                                            </Link>
+                                                            <EvidencePreview key={i} link={link} />
                                                         ))}
                                                      </div>
                                                 )}
@@ -136,7 +161,7 @@ export default function ExecutionDetailsPage() {
                                                          {result.evidenceFiles.map((file, i) => (
                                                             <div key={i} className="flex items-center text-muted-foreground">
                                                                 <Paperclip className="mr-2 h-4 w-4" />
-                                                                <span>{file}</span>
+                                                                <span>{file} (File name only)</span>
                                                             </div>
                                                         ))}
                                                     </div>
