@@ -56,12 +56,12 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        // Only proceed if projects have been loaded and are not undefined
-        if (areProjectsLoading || projects === undefined || !user || !firestore) {
-            // Keep loading if projects are loading, or stop if there's no user/db
-             if (!areProjectsLoading) {
-                setIsLoading(false);
-            }
+        if (areProjectsLoading) {
+            setIsLoading(true);
+            return;
+        }
+        if (projects === undefined || !user || !firestore) {
+             setIsLoading(false);
             return;
         }
 
