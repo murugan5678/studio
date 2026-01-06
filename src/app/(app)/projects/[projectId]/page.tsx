@@ -145,6 +145,13 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     }
   };
 
+  const getRunStats = (run: TestExecutionRun) => {
+    const passed = run.results.filter(r => r.status === 'Passed').length;
+    const failed = run.results.filter(r => r.status === 'Failed').length;
+    const total = run.results.length;
+    return { passed, failed, total };
+  };
+
   const kpiData = [
     { title: "Total Test Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
     { title: "Executed", value: projectStats.executedCount.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
@@ -400,10 +407,52 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                     </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className='text-center py-12 text-muted-foreground'>
-                    <p>No execution runs yet.</p>
-                    <p className='text-sm'>Start by creating a new execution run.</p>
-                  </div>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Run Title</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Results</TableHead>
+                            <TableHead>Status</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {areExecutionsLoading && (
+                            <TableRow>
+                                <TableCell colSpan={4} className="h-24 text-center">
+                                    Loading execution runs...
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {!areExecutionsLoading && executionRuns && executionRuns.length > 0 ? (
+                            executionRuns.map(run => {
+                                const stats = getRunStats(run);
+                                return (
+                                    <TableRow key={run.id}>
+                                        <TableCell className="font-medium">{run.title}</TableCell>
+                                        <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
+                                        <TableCell>
+                                            {stats.passed} Passed, {stats.failed} Failed ({stats.total} total)
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={stats.failed > 0 ? 'destructive' : 'secondary'}>
+                                                {stats.failed > 0 ? 'Failed' : 'Passed'}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                )
+                            })
+                        ) : (
+                            !areExecutionsLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">
+                                        No execution runs yet.
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        )}
+                    </TableBody>
+                </Table>
                 </CardContent>
             </Card>
         </TabsContent>
