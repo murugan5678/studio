@@ -1,14 +1,20 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bot, Lightbulb } from 'lucide-react';
+import { Bot, Lightbulb, TestTube } from 'lucide-react';
 import Link from 'next/link';
 
 const aiTools = [
     {
         title: 'AI Scenario Generator',
-        description: 'Upload a file (screenshot, doc) or provide a text description/link to have AI generate test cases for you.',
+        description: 'Upload a file (screenshot, doc) or provide a text description/link to have AI generate test scenarios for you.',
         icon: Lightbulb,
         href: '/ai/scenario-generator'
+    },
+    {
+        title: 'AI Test Case Generator',
+        description: 'Based on a scenario, screenshot, or Figma link, the AI will create detailed test cases for your review.',
+        icon: TestTube,
+        href: '/ai/test-case-generator'
     },
     {
         title: 'AI Script Generator',
