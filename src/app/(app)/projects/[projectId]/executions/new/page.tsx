@@ -4,13 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -28,7 +29,7 @@ import type { TestCase } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Info } from 'lucide-react';
 
 const executionFormSchema = z.object({
   title: z.string().min(2, 'Title is required.'),
@@ -43,6 +44,7 @@ const executionResultsSchema = z.object({
       comments: z.string().optional(),
       evidenceLinks: z.string().optional(),
       evidenceFiles: z.custom<FileList>().optional(),
+      filePreviews: z.array(z.string()).optional(),
     })
   ),
 });
@@ -79,7 +81,7 @@ export default function NewExecutionPage() {
     }
   });
 
-  const { fields } = useFieldArray({
+  const { fields, update } = useFieldArray({
     control: resultsForm.control,
     name: 'executions',
   });
@@ -95,6 +97,7 @@ export default function NewExecutionPage() {
             status: 'Passed',
             comments: '',
             evidenceLinks: '',
+            filePreviews: [],
         }))
     });
 
@@ -125,18 +128,37 @@ export default function NewExecutionPage() {
     
     const testExecutionsCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
     
-    try {
-        await addDocumentNonBlocking(testExecutionsCollection, executionRunData);
-        toast({
-            title: 'Execution Run Saved',
-            description: 'The test execution results have been saved.',
-        });
-        router.push(`/projects/${params.projectId}`);
-    } catch (error) {
-        console.error("Error saving execution run:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not save execution results.' });
-    }
+    addDocumentNonBlocking(testExecutionsCollection, executionRunData);
+
+    toast({
+        title: 'Execution Run Saved',
+        description: 'The test execution results have been saved.',
+    });
+    router.push(`/projects/${params.projectId}`);
   }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const files = e.target.files;
+    if (files) {
+      const currentExecution = resultsForm.getValues(`executions.${index}`);
+      update(index, { ...currentExecution, evidenceFiles: files });
+
+      const newPreviews = Array.from(files).map(file => URL.createObjectURL(file));
+      update(index, { 
+        ...resultsForm.getValues(`executions.${index}`), 
+        filePreviews: newPreviews
+      });
+    }
+  };
+
+  useEffect(() => {
+    // Clean up object URLs on unmount
+    return () => {
+        resultsForm.getValues('executions').forEach(exec => {
+            exec.filePreviews?.forEach(previewUrl => URL.revokeObjectURL(previewUrl));
+        });
+    };
+  }, [resultsForm]);
   
   return (
     <Card>
@@ -227,6 +249,7 @@ export default function NewExecutionPage() {
         {step === 2 && (
             <Form {...resultsForm}>
                 <form onSubmit={resultsForm.handleSubmit(onRecordResults)} className="space-y-6">
+                  <TooltipProvider>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -240,6 +263,8 @@ export default function NewExecutionPage() {
                             {fields.map((field, index) => {
                                 const testCase = selectedTestCases.find(tc => tc.id === field.testCaseId);
                                 if (!testCase) return null;
+                                
+                                const filePreviews = resultsForm.watch(`executions.${index}.filePreviews`) || [];
 
                                 return (
                                 <TableRow key={field.id}>
@@ -275,21 +300,21 @@ export default function NewExecutionPage() {
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Textarea placeholder="Add comments..." {...field} className="h-12"/>
+                                                        <Textarea placeholder="Add comments..." {...field} className="h-24"/>
                                                     </FormControl>
                                                 </FormItem>
                                             )}
                                         />
                                     </TableCell>
                                     <TableCell className='space-y-2'>
-                                        <div className='flex items-center gap-1'>
+                                        <div className='flex items-start gap-1'>
                                          <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceLinks`}
                                             render={({ field }) => (
                                                 <FormItem className='flex-1'>
                                                     <FormControl>
-                                                        <Input placeholder="Paste URL (comma-separated)" {...field} />
+                                                        <Input placeholder="Paste URL (comma-separated for multiple)" {...field} />
                                                     </FormControl>
                                                 </FormItem>
                                             )}
@@ -298,32 +323,57 @@ export default function NewExecutionPage() {
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                         </div>
-                                        <div className='flex items-center gap-1'>
-                                        <FormField
+                                        <div className='flex items-start gap-1'>
+                                          <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceFiles`}
-                                            render={({ field: { onChange, value, ...fieldProps} }) => (
+                                            render={({ field: { onChange, ...fieldProps} }) => (
                                                 <FormItem className='flex-1'>
+                                                    <div className='flex items-center gap-1'>
                                                     <FormControl>
                                                         <Input 
                                                             {...fieldProps}
                                                             type="file" 
                                                             multiple
-                                                            onChange={(e) => onChange(e.target.files)}
+                                                            accept="image/*,video/*"
+                                                            onChange={(e) => handleFileChange(e, index)}
                                                         />
                                                     </FormControl>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p className='text-xs max-w-xs'>File uploads are for local preview only and will not be saved permanently. Only the file name is stored.</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                    </div>
                                                 </FormItem>
                                             )}
-                                        />
-                                        <Button size="icon" variant="ghost" type="button" onClick={() => resultsForm.setValue(`executions.${index}.evidenceFiles`, undefined)}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                          />
+                                          <Button size="icon" variant="ghost" type="button" onClick={() => {
+                                              const currentExecution = resultsForm.getValues(`executions.${index}`);
+                                              URL.revokeObjectURL(currentExecution.filePreviews?.[0] || '');
+                                              update(index, { ...currentExecution, evidenceFiles: undefined, filePreviews: [] });
+                                          }}>
+                                              <Trash2 className="h-4 w-4" />
+                                          </Button>
                                         </div>
+                                        {filePreviews.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {filePreviews.map((previewUrl, i) => (
+                                                    <div key={i} className="relative w-20 h-20">
+                                                        <Image src={previewUrl} alt={`Preview ${i}`} layout="fill" objectFit="cover" className="rounded-md"/>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             )})}
                         </TableBody>
                     </Table>
+                  </TooltipProvider>
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setStep(1)}>
                            <ArrowLeft className="mr-2 h-4 w-4" />
