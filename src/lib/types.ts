@@ -45,6 +45,5 @@ export interface TestExecutionResult {
     testCaseId: string;
     status: 'Passed' | 'Failed' | 'Blocked' | 'Deferred' | "Can't Test";
     comments?: string;
-    evidence?: string;
+    evidenceLinks?: string[];
 }
-

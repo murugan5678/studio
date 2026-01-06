@@ -41,7 +41,7 @@ const executionResultsSchema = z.object({
       testCaseId: z.string(),
       status: z.enum(['Passed', 'Failed', 'Blocked', 'Deferred', "Can't Test"]),
       comments: z.string().optional(),
-      evidence: z.string().optional(),
+      evidenceLinks: z.string().optional(),
     })
   ),
 });
@@ -88,7 +88,7 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
             testCaseId: tc.id,
             status: 'Passed',
             comments: '',
-            evidence: '',
+            evidenceLinks: '',
         }))
     });
 
@@ -106,7 +106,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
       projectId: params.projectId,
       userId: user.uid,
       createdAt: serverTimestamp(),
-      results: values.executions,
+      results: values.executions.map(ex => ({
+        ...ex,
+        evidenceLinks: ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : []
+      })),
     };
     
     const testExecutionsCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
@@ -216,9 +219,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className='w-[40%]'>Test Case</TableHead>
-                                <TableHead className='w-[20%]'>Status</TableHead>
-                                <TableHead className='w-[40%]'>Comments / Evidence</TableHead>
+                                <TableHead className='w-[30%]'>Test Case</TableHead>
+                                <TableHead className='w-[15%]'>Status</TableHead>
+                                <TableHead className='w-[25%]'>Comments</TableHead>
+                                <TableHead className='w-[30%]'>Evidence Links</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -262,6 +266,20 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                                             )}
                                         />
                                     </TableCell>
+                                    <TableCell>
+                                         <FormField
+                                            control={resultsForm.control}
+                                            name={`executions.${index}.evidenceLinks`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input placeholder="https://..." {...field} />
+                                                    </FormControl>
+                                                    <FormDescription className="text-xs">Comma-separated links.</FormDescription>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -280,5 +298,3 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
     </Card>
   );
 }
-
-    
