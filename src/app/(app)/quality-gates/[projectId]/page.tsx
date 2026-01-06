@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, serverTimestamp, getDocs } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun, Defect, QualityGateConfig, DeploymentApproval, DeploymentApprovalHistory } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -52,18 +52,38 @@ export default function QualityGateDetailsPage() {
     const [approvalAction, setApprovalAction] = useState<'approve' | 'block' | null>(null);
 
     const projectRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}`) : null, [user, firestore, params.projectId]);
-    const testCasesQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`)) : null, [user, firestore, params.projectId]);
-    const executionsQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`)) : null, [user, firestore, params.projectId]);
-    const defectsQuery = useMemoFirebase(() => user && firestore ? query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/defects`)) : null, [user, firestore, params.projectId]);
     const gateConfigRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}/qualityGateConfig/${params.projectId}`) : null, [user, firestore, params.projectId]);
     const approvalRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}/deploymentApproval/${params.projectId}`) : null, [user, firestore, params.projectId]);
     
     const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
-    const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
-    const { data: executions, isLoading: areExecutionsLoading } = useCollection<TestExecutionRun>(executionsQuery);
-    const { data: defects, isLoading: areDefectsLoading } = useCollection<Defect>(defectsQuery);
     const { data: gateConfig, isLoading: isConfigLoading } = useDoc<QualityGateConfig>(gateConfigRef);
     const { data: approval, isLoading: isApprovalLoading } = useDoc<DeploymentApproval>(approvalRef);
+
+    const [aggregatedData, setAggregatedData] = useState<{ executions: TestExecutionRun[], defects: Defect[] } | null>(null);
+    const [isAggregatedDataLoading, setIsAggregatedDataLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user || !firestore || !params.projectId) return;
+
+        const fetchData = async () => {
+            setIsAggregatedDataLoading(true);
+            const execQuery = query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`));
+            const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/defects`));
+
+            const [execSnap, defectSnap] = await Promise.all([
+                getDocs(execQuery),
+                getDocs(defectQuery),
+            ]);
+
+            const executions = execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun));
+            const defects = defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect));
+            
+            setAggregatedData({ executions, defects });
+            setIsAggregatedDataLoading(false);
+        }
+        fetchData();
+    }, [user, firestore, params.projectId])
+
 
     const form = useForm<z.infer<typeof qualityGateSchema>>({
         resolver: zodResolver(qualityGateSchema),
@@ -78,22 +98,20 @@ export default function QualityGateDetailsPage() {
     useEffect(() => {
         if (gateConfig) {
             form.reset(gateConfig);
-        } else {
-            // If there's no config in the DB, reset to defaults to ensure form is controlled
-            form.reset({ minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 });
         }
     }, [gateConfig, form]);
 
     const projectMetrics = useMemo(() => {
-        if (areTestCasesLoading || areExecutionsLoading || areDefectsLoading) return null;
+        if (!aggregatedData) return null;
 
+        const { executions, defects } = aggregatedData;
         let passed = 0, totalExecuted = 0;
-        (executions || []).forEach(run => {
+        executions.forEach(run => {
             run.results.forEach(res => { totalExecuted++; if (res.status === 'Passed') passed++; });
         });
 
         const openBugs = { critical: 0, high: 0, medium: 0 };
-        (defects || []).forEach(d => {
+        defects.forEach(d => {
             if (d.status === 'Open') {
                 if (d.severity === 'Critical') openBugs.critical++;
                 if (d.severity === 'High') openBugs.high++;
@@ -103,10 +121,9 @@ export default function QualityGateDetailsPage() {
 
         const passPercentage = totalExecuted > 0 ? (passed / totalExecuted) * 100 : 100;
         return { passPercentage, openBugs };
-    }, [testCases, executions, defects, areTestCasesLoading, areExecutionsLoading, areDefectsLoading]);
+    }, [aggregatedData]);
 
     const gateStatus = useMemo(() => {
-        // Ensure metrics are calculated and config is loaded before evaluating
         if (!projectMetrics || isConfigLoading) return null;
 
         const currentConfig = gateConfig ?? form.getValues();
@@ -163,7 +180,7 @@ export default function QualityGateDetailsPage() {
         approvalForm.reset();
     }
 
-    const isLoading = isProjectLoading || projectMetrics === null;
+    const isLoading = isProjectLoading || isConfigLoading || isApprovalLoading || isAggregatedDataLoading;
 
     if (isLoading) return (
         <div className="space-y-6">
@@ -289,5 +306,3 @@ export default function QualityGateDetailsPage() {
         </div>
     );
 }
-
-    
