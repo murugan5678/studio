@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, Bot, PlayCircle } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -145,11 +145,15 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
       <Tabs defaultValue="test-cases">
         <div className="flex justify-between items-center">
             <TabsList>
-                <TabsTrigger value="test-cases">Test Cases Management</TabsTrigger>
-                <TabsTrigger value="executions">Test Execution Management</TabsTrigger>
+                <TabsTrigger value="test-cases">Test Cases</TabsTrigger>
+                <TabsTrigger value="executions">Test Execution</TabsTrigger>
             </TabsList>
             <div className='flex items-center gap-2'>
-                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button>
+                 <Button asChild variant="outline">
+                    <Link href={`/projects/${params.projectId}/ai-script-generator`}>
+                        <Bot className="mr-2 h-4 w-4" /> AI Script Generator
+                    </Link>
+                </Button>
                 <Button asChild>
                     <Link href={`/projects/${params.projectId}/new-test-case`}>
                         <PlusCircle className="mr-2 h-4 w-4" /> New Test Case
@@ -210,12 +214,22 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
         </TabsContent>
         <TabsContent value="executions">
         <Card>
-                <CardHeader>
-                    <CardTitle>Test Executions</CardTitle>
-                    <CardDescription>Execution history for this project.</CardDescription>
+                <CardHeader className='flex-row items-center justify-between'>
+                    <div>
+                        <CardTitle>Test Executions</CardTitle>
+                        <CardDescription>Execution history for this project.</CardDescription>
+                    </div>
+                     <Button asChild>
+                        <Link href={`/projects/${params.projectId}/executions/new`}>
+                            <PlayCircle className="mr-2 h-4 w-4" /> New Execution Run
+                        </Link>
+                    </Button>
                 </CardHeader>
                 <CardContent>
-                  <p>Execution history will be displayed here.</p>
+                  <div className='text-center py-12 text-muted-foreground'>
+                    <p>No execution runs yet.</p>
+                    <p className='text-sm'>Start by creating a new execution run.</p>
+                  </div>
                 </CardContent>
             </Card>
         </TabsContent>
