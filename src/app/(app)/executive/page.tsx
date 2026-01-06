@@ -22,6 +22,8 @@ import { collection, getDocs, query } from "firebase/firestore";
 import type { Project, TestCase, TestExecutionRun, Defect } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 
 const chartConfig = {
   score: { label: 'Score', color: 'hsl(var(--chart-2))' },
@@ -44,6 +46,7 @@ export default function ExecutiveDashboardPage() {
     const firestore = useFirestore();
     const [aggregatedData, setAggregatedData] = useState<AggregatedData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [selectedProjectId, setSelectedProjectId] = useState('all');
 
     const projectsQuery = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -60,11 +63,21 @@ export default function ExecutiveDashboardPage() {
 
         const fetchData = async () => {
             setIsLoading(true);
+            const projectsToFetch = selectedProjectId === 'all' 
+                ? projects 
+                : projects.filter(p => p.id === selectedProjectId);
+
+            if (!projectsToFetch) {
+                setAggregatedData({ testCases: [], executions: [], defects: [] });
+                setIsLoading(false);
+                return;
+            }
+
             const allTestCases: TestCase[] = [];
             const allExecutions: TestExecutionRun[] = [];
             const allDefects: Defect[] = [];
 
-            for (const project of projects) {
+            for (const project of projectsToFetch) {
                 const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`));
                 const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
                 const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
@@ -83,7 +96,7 @@ export default function ExecutiveDashboardPage() {
             setIsLoading(false);
         }
         fetchData();
-    }, [projects, user, firestore, areProjectsLoading]);
+    }, [projects, user, firestore, areProjectsLoading, selectedProjectId]);
 
 
     const executiveMetrics = useMemo(() => {
@@ -173,7 +186,7 @@ export default function ExecutiveDashboardPage() {
         { month: "Apr", score: 80 }, { month: "May", score: 85 }, { month: "Jun", score: executiveMetrics?.qualityHealthScore ?? 0 },
     ]
 
-    if (isLoading || !executiveMetrics) {
+    if (isLoading || areProjectsLoading) {
         return (
             <div className="space-y-6">
                 <Skeleton className="h-10 w-1/3" />
@@ -191,13 +204,28 @@ export default function ExecutiveDashboardPage() {
         )
     }
 
-    const { qualityHealthScore, riskLevel, releaseReadiness, flakyTests } = executiveMetrics;
+    const { qualityHealthScore, riskLevel, releaseReadiness, flakyTests } = executiveMetrics || {};
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Executive Dashboard</h1>
-                <p className="text-muted-foreground">A high-level overview of quality, risk, and release readiness.</p>
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Executive Dashboard</h1>
+                    <p className="text-muted-foreground">A high-level overview of quality, risk, and release readiness.</p>
+                </div>
+                <div className="w-64">
+                    <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Projects</SelectItem>
+                            {projects?.map(p => (
+                                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             <div className="grid gap-6 md:grid-cols-3">
@@ -208,7 +236,7 @@ export default function ExecutiveDashboardPage() {
                     </CardHeader>
                     <CardContent className="flex flex-col items-center">
                         <div className="flex items-baseline">
-                            <p className="text-7xl font-bold">{qualityHealthScore}</p>
+                            <p className="text-7xl font-bold">{qualityHealthScore ?? 'N/A'}</p>
                             <span className="text-2xl text-muted-foreground">/100</span>
                         </div>
                          {/* This part needs historical data to be meaningful */}
@@ -226,7 +254,7 @@ export default function ExecutiveDashboardPage() {
                          </div>
                     </CardHeader>
                     <CardContent>
-                        <p className={`text-4xl font-bold ${riskLevel === 'High' ? 'text-destructive' : riskLevel === 'Medium' ? 'text-amber-500' : 'text-green-500'}`}>{riskLevel}</p>
+                        <p className={`text-4xl font-bold ${riskLevel === 'High' ? 'text-destructive' : riskLevel === 'Medium' ? 'text-amber-500' : 'text-green-500'}`}>{riskLevel || 'N/A'}</p>
                         <p className="text-xs text-muted-foreground mt-2">Based on open critical defects and health score.</p>
                     </CardContent>
                 </Card>
@@ -238,7 +266,7 @@ export default function ExecutiveDashboardPage() {
                          </div>
                     </CardHeader>
                     <CardContent>
-                        <p className={`text-4xl font-bold ${releaseReadiness === 'Blocked' ? 'text-destructive' : releaseReadiness === 'At Risk' ? 'text-amber-500' : 'text-green-500'}`}>{releaseReadiness}</p>
+                        <p className={`text-4xl font-bold ${releaseReadiness === 'Blocked' ? 'text-destructive' : releaseReadiness === 'At Risk' ? 'text-amber-500' : 'text-green-500'}`}>{releaseReadiness || 'N/A'}</p>
                         <p className="text-xs text-muted-foreground mt-2">Based on current risk level.</p>
                     </CardContent>
                 </Card>
@@ -285,7 +313,7 @@ export default function ExecutiveDashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {flakyTests.length > 0 ? flakyTests.map(test => (
+                                {flakyTests && flakyTests.length > 0 ? flakyTests.map(test => (
                                     <TableRow key={test.id}>
                                         <TableCell>
                                             <div className="font-medium">{test.title}</div>
