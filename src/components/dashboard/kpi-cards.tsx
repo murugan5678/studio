@@ -2,50 +2,22 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Folder, Beaker, CheckCircle, XCircle } from "lucide-react";
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection, collectionGroup, query } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { useMemo } from "react";
 
 interface KpiCardsProps {
   projects: Project[];
+  testCases: TestCase[];
+  executions: TestExecutionRun[];
 }
 
-export function KpiCards({ projects }: KpiCardsProps) {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const allTestCasesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collectionGroup(firestore, 'testCases'));
-  }, [user, firestore]);
-
-  const allExecutionsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collectionGroup(firestore, 'testExecutions'));
-  }, [user, firestore]);
-
-  const { data: allTestCases } = useCollection<TestCase>(allTestCasesQuery);
-  const { data: allExecutions } = useCollection<TestExecutionRun>(allExecutionsQuery);
-
-  const userTestCases = useMemo(() => {
-    if (!allTestCases || !user) return [];
-    // Firestore collection group queries are not user-specific, so we filter client-side
-    // This is less efficient but necessary without more complex rules/queries
-    return allTestCases.filter(tc => tc.createdBy === user.uid);
-  }, [allTestCases, user]);
-  
-  const userExecutions = useMemo(() => {
-    if (!allExecutions || !user) return [];
-    return allExecutions.filter(ex => ex.userId === user.uid);
-  }, [allExecutions, user]);
-
+export function KpiCards({ projects, testCases, executions }: KpiCardsProps) {
 
   const executionStats = useMemo(() => {
     let passed = 0;
     let failed = 0;
-    if (userExecutions) {
-        userExecutions.forEach(run => {
+    if (executions) {
+        executions.forEach(run => {
             run.results.forEach(result => {
                 if (result.status === 'Passed') passed++;
                 if (result.status === 'Failed') failed++;
@@ -53,12 +25,12 @@ export function KpiCards({ projects }: KpiCardsProps) {
         });
     }
     return { passed, failed };
-  }, [userExecutions]);
+  }, [executions]);
 
 
   const kpiData = [
     { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder, color: "text-sky-500" },
-    { title: "Total Test Cases", value: (userTestCases || []).length.toLocaleString(), icon: Beaker, color: "text-amber-500" },
+    { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker, color: "text-amber-500" },
     { title: "Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
     { title: "Failed", value: executionStats.failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
   ];

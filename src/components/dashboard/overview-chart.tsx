@@ -9,13 +9,11 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell } from 'recharts';
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import type { Project, TestExecutionRun } from '@/lib/types';
+import type { TestExecutionRun } from '@/lib/types';
 import { useMemo } from 'react';
-import { collectionGroup, query } from 'firebase/firestore';
 
 interface OverviewChartProps {
-    projects: Project[];
+    executions: TestExecutionRun[];
 }
 
 const chartConfig = {
@@ -44,29 +42,15 @@ const chartConfig = {
     },
 };
 
-export function OverviewChart({ projects }: OverviewChartProps) {
-  const { user } = useUser();
-  const firestore = useFirestore();
-
-  const allExecutionsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collectionGroup(firestore, 'testExecutions'));
-  }, [user, firestore]);
-
-  const { data: allExecutions } = useCollection<TestExecutionRun>(allExecutionsQuery);
+export function OverviewChart({ executions }: OverviewChartProps) {
   
-  const userExecutions = useMemo(() => {
-    if (!allExecutions || !user) return [];
-    return allExecutions.filter(ex => ex.userId === user.uid);
-  }, [allExecutions, user]);
-
   const { chartData, totalExecutions } = useMemo(() => {
     const statusCounts: { [key: string]: number } = {
         'Passed': 0, 'Failed': 0, 'Blocked': 0, 'Deferred': 0, "Can't Test": 0,
     };
     let total = 0;
 
-    (userExecutions || []).forEach(run => {
+    (executions || []).forEach(run => {
         run.results.forEach(result => {
             total++;
             if (statusCounts.hasOwnProperty(result.status)) {
@@ -84,7 +68,7 @@ export function OverviewChart({ projects }: OverviewChartProps) {
         })).filter(item => item.count > 0);
 
     return { chartData: dataForChart, totalExecutions: total };
-  }, [userExecutions]);
+  }, [executions]);
 
 
   return (
