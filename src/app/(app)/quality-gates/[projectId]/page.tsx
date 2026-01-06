@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, setDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, serverTimestamp } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun, Defect, QualityGateConfig, DeploymentApproval, DeploymentApprovalHistory } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -11,13 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Check, X, ShieldCheck, Ban } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 
@@ -76,20 +75,25 @@ export default function QualityGateDetailsPage() {
         defaultValues: { comment: '' }
     });
 
-    useMemo(() => {
-        if (gateConfig) form.reset(gateConfig);
+    useEffect(() => {
+        if (gateConfig) {
+            form.reset(gateConfig);
+        } else {
+            // If there's no config in the DB, reset to defaults to ensure form is controlled
+            form.reset({ minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 });
+        }
     }, [gateConfig, form]);
 
     const projectMetrics = useMemo(() => {
-        if (!testCases || !executions || !defects) return null;
+        if (areTestCasesLoading || areExecutionsLoading || areDefectsLoading) return null;
 
         let passed = 0, totalExecuted = 0;
-        executions.forEach(run => {
+        (executions || []).forEach(run => {
             run.results.forEach(res => { totalExecuted++; if (res.status === 'Passed') passed++; });
         });
 
         const openBugs = { critical: 0, high: 0, medium: 0 };
-        defects.forEach(d => {
+        (defects || []).forEach(d => {
             if (d.status === 'Open') {
                 if (d.severity === 'Critical') openBugs.critical++;
                 if (d.severity === 'High') openBugs.high++;
@@ -99,20 +103,23 @@ export default function QualityGateDetailsPage() {
 
         const passPercentage = totalExecuted > 0 ? (passed / totalExecuted) * 100 : 100;
         return { passPercentage, openBugs };
-    }, [testCases, executions, defects]);
+    }, [testCases, executions, defects, areTestCasesLoading, areExecutionsLoading, areDefectsLoading]);
 
     const gateStatus = useMemo(() => {
-        if (!projectMetrics || !gateConfig) return null;
+        // Ensure metrics are calculated and config is loaded before evaluating
+        if (!projectMetrics || isConfigLoading) return null;
 
-        const passRateMet = projectMetrics.passPercentage >= gateConfig.minPassPercentage;
-        const criticalBugsMet = projectMetrics.openBugs.critical <= gateConfig.maxCriticalBugs;
-        const highBugsMet = projectMetrics.openBugs.high <= gateConfig.maxHighBugs;
-        const mediumBugsMet = projectMetrics.openBugs.medium <= gateConfig.maxMediumBugs;
+        const currentConfig = gateConfig ?? form.getValues();
+
+        const passRateMet = projectMetrics.passPercentage >= currentConfig.minPassPercentage;
+        const criticalBugsMet = projectMetrics.openBugs.critical <= currentConfig.maxCriticalBugs;
+        const highBugsMet = projectMetrics.openBugs.high <= currentConfig.maxHighBugs;
+        const mediumBugsMet = projectMetrics.openBugs.medium <= currentConfig.maxMediumBugs;
 
         const allGatesPassed = passRateMet && criticalBugsMet && highBugsMet && mediumBugsMet;
 
         return { passRateMet, criticalBugsMet, highBugsMet, mediumBugsMet, allGatesPassed };
-    }, [projectMetrics, gateConfig]);
+    }, [projectMetrics, gateConfig, isConfigLoading, form]);
 
     async function onSaveGate(values: z.infer<typeof qualityGateSchema>) {
         if (!gateConfigRef) return;
@@ -135,7 +142,8 @@ export default function QualityGateDetailsPage() {
             comment: values.comment || '',
         };
 
-        const newHistory = approval?.history ? [...approval.history, historyEntry] : [historyEntry];
+        const currentHistory = approval?.history ?? [];
+        const newHistory = [...currentHistory, historyEntry];
 
         const data = {
             id: params.projectId,
@@ -152,16 +160,17 @@ export default function QualityGateDetailsPage() {
         toast({ title: `Project ${newStatus}`, description: `The project has been marked as ${newStatus}.` });
         setIsApproving(false);
         setIsDialogOpen(false);
+        approvalForm.reset();
     }
 
-    const isLoading = isProjectLoading || areTestCasesLoading || areExecutionsLoading || areDefectsLoading || isConfigLoading || isApprovalLoading;
+    const isLoading = isProjectLoading || projectMetrics === null;
 
     if (isLoading) return (
         <div className="space-y-6">
             <Skeleton className="h-8 w-1/4" />
             <div className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
                 <Card className="lg:col-span-2"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
+                <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
             </div>
         </div>
     );
@@ -173,7 +182,7 @@ export default function QualityGateDetailsPage() {
                     <DialogHeader>
                         <DialogTitle>Confirm {approvalAction === 'approve' ? 'Approval' : 'Block'}</DialogTitle>
                         <DialogDescription>
-                            Please provide a comment for this action.
+                            Please provide a comment for this action. This will be recorded in the audit history.
                         </DialogDescription>
                     </DialogHeader>
                     <Form {...approvalForm}>
@@ -253,22 +262,24 @@ export default function QualityGateDetailsPage() {
                             <CardTitle>Deployment Approval</CardTitle>
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">Status:</span>
+                                {isApprovalLoading ? <Skeleton className="h-6 w-24" /> :
                                 <Badge variant={gateStatus?.allGatesPassed ? 'secondary' : 'destructive'}>
                                     {approval?.status ?? 'Not Ready'}
                                 </Badge>
+                                }
                             </div>
                         </CardHeader>
                         <CardContent className="divide-y">
-                            <GateChecklistItem label="Pass Rate Met" isMet={gateStatus?.passRateMet ?? null} />
-                            <GateChecklistItem label="No Critical Bugs" isMet={gateStatus?.criticalBugsMet ?? null} />
-                            <GateChecklistItem label="High Bug Threshold Met" isMet={gateStatus?.highBugsMet ?? null} />
-                            <GateChecklistItem label="Medium Bug Threshold Met" isMet={gateStatus?.mediumBugsMet ?? null} />
+                            <GateChecklistItem label={`Test Pass Rate >= ${form.watch('minPassPercentage')}%`} isMet={gateStatus?.passRateMet ?? null} />
+                            <GateChecklistItem label={`Critical Bugs <= ${form.watch('maxCriticalBugs')}`} isMet={gateStatus?.criticalBugsMet ?? null} />
+                            <GateChecklistItem label={`High Bugs <= ${form.watch('maxHighBugs')}`} isMet={gateStatus?.highBugsMet ?? null} />
+                            <GateChecklistItem label={`Medium Bugs <= ${form.watch('maxMediumBugs')}`} isMet={gateStatus?.mediumBugsMet ?? null} />
                         </CardContent>
                         <CardFooter className="flex-col gap-2 pt-4">
-                            <Button className="w-full" disabled={!gateStatus?.allGatesPassed} onClick={() => { setApprovalAction('approve'); setIsDialogOpen(true); }}>
+                            <Button className="w-full" disabled={!gateStatus?.allGatesPassed || isApproving} onClick={() => { setApprovalAction('approve'); setIsDialogOpen(true); }}>
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve for Deployment
                             </Button>
-                            <Button variant="destructive" className="w-full" onClick={() => { setApprovalAction('block'); setIsDialogOpen(true); }}>
+                            <Button variant="destructive" className="w-full" disabled={isApproving} onClick={() => { setApprovalAction('block'); setIsDialogOpen(true); }}>
                                 <Ban className="mr-2 h-4 w-4" /> Block Deployment
                             </Button>
                         </CardFooter>
@@ -278,3 +289,5 @@ export default function QualityGateDetailsPage() {
         </div>
     );
 }
+
+    
