@@ -1,0 +1,428 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user within the TestAI application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User's display name."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "displayName",
+        "createdAt"
+      ]
+    },
+    "Project": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Project",
+      "type": "object",
+      "description": "Represents a QA project within the TestAI application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the project entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the project."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the project."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the project was created.",
+          "format": "date-time"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Project)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "createdAt",
+        "userId"
+      ]
+    },
+    "TestCase": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TestCase",
+      "type": "object",
+      "description": "Represents a test case within a project.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the test case entity."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Reference to Project. (Relationship: Project 1:N TestCase)"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the test case."
+        },
+        "module": {
+          "type": "string",
+          "description": "Module or feature the test case belongs to."
+        },
+        "priority": {
+          "type": "string",
+          "description": "Priority of the test case (Low, Medium, High, Critical)."
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity of the potential defect if the test fails."
+        },
+        "preconditions": {
+          "type": "string",
+          "description": "Preconditions required to execute the test case."
+        },
+        "testSteps": {
+          "type": "string",
+          "description": "Step-by-step instructions for executing the test case."
+        },
+        "expectedResult": {
+          "type": "string",
+          "description": "Expected outcome of the test case execution."
+        },
+        "tags": {
+          "type": "array",
+          "description": "References to Tags. (Relationship: Tag N:N TestCase)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "automationFeasibility": {
+          "type": "string",
+          "description": "Indicates whether the test case is suitable for automation."
+        },
+        "automationPriority": {
+          "type": "string",
+          "description": "Priority for automating the test case."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of test (Positive, Negative, Edge)."
+        },
+        "subModule": {
+          "type": "string",
+          "description": "The sub module that this test case is testing."
+        },
+        "team": {
+          "type": "string",
+          "description": "The specific team in charge of this test case."
+        },
+        "sprint": {
+          "type": "string",
+          "description": "The sprint this test case belongs to."
+        },
+        "release": {
+          "type": "string",
+          "description": "The release this test case belongs to."
+        },
+        "testData": {
+          "type": "string",
+          "description": "Specific data related to this test case."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "The user that created this test case."
+        },
+        "createdDate": {
+          "type": "string",
+          "description": "The date this test case was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "projectId",
+        "title",
+        "module",
+        "priority",
+        "severity",
+        "preconditions",
+        "testSteps",
+        "expectedResult",
+        "automationFeasibility"
+      ]
+    },
+    "TestExecution": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TestExecution",
+      "type": "object",
+      "description": "Represents the execution of a test case.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the test execution entity."
+        },
+        "testCaseId": {
+          "type": "string",
+          "description": "Reference to TestCase. (Relationship: TestCase 1:N TestExecution)"
+        },
+        "testerName": {
+          "type": "string",
+          "description": "Name of the tester who executed the test case."
+        },
+        "executionDate": {
+          "type": "string",
+          "description": "Date when the test case was executed.",
+          "format": "date-time"
+        },
+        "environment": {
+          "type": "string",
+          "description": "Environment in which the test case was executed."
+        },
+        "buildVersion": {
+          "type": "string",
+          "description": "Build version of the application being tested."
+        },
+        "resultStatus": {
+          "type": "string",
+          "description": "Result status of the test execution (Passed, Failed, Deferred, etc.)."
+        },
+        "evidenceLinks": {
+          "type": "array",
+          "description": "Links to evidence (screenshots, videos, logs).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "comments": {
+          "type": "string",
+          "description": "Comments or notes about the test execution."
+        }
+      },
+      "required": [
+        "id",
+        "testCaseId",
+        "testerName",
+        "executionDate",
+        "environment",
+        "buildVersion",
+        "resultStatus"
+      ]
+    },
+    "AutomationScript": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AutomationScript",
+      "type": "object",
+      "description": "Represents an automation script generated for a test case.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the automation script entity."
+        },
+        "testCaseId": {
+          "type": "string",
+          "description": "Reference to TestCase. (Relationship: TestCase 1:1 AutomationScript)"
+        },
+        "framework": {
+          "type": "string",
+          "description": "Automation framework used (Playwright, Cypress, Selenium)."
+        },
+        "scriptContent": {
+          "type": "string",
+          "description": "The actual automation script code."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the automation script was generated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "testCaseId",
+        "framework",
+        "scriptContent",
+        "createdAt"
+      ]
+    },
+    "Tag": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Tag",
+      "type": "object",
+      "description": "Represents a tag or label that can be applied to test cases.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the tag entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the tag."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the tag."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles.  User's ID is derived from Firebase Authentication.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user, matching the Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}",
+        "definition": {
+          "entityName": "Project",
+          "schema": {
+            "$ref": "#/backend/entities/Project"
+          },
+          "description": "Stores projects owned by a specific user. Authorization is based on path ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user who owns the project."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the project."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/testCases/{testCaseId}",
+        "definition": {
+          "entityName": "TestCase",
+          "schema": {
+            "$ref": "#/backend/entities/TestCase"
+          },
+          "description": "Stores test cases associated with a specific project. Authorization is based on project ownership, derived from the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user who owns the project."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the project containing the test case."
+            },
+            {
+              "name": "testCaseId",
+              "description": "The unique ID of the test case."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/testExecutions/{testExecutionId}",
+        "definition": {
+          "entityName": "TestExecution",
+          "schema": {
+            "$ref": "#/backend/entities/TestExecution"
+          },
+          "description": "Stores test executions associated with a specific project.  Authorization is based on project ownership, derived from the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user who owns the project."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the project containing the test execution."
+            },
+            {
+              "name": "testExecutionId",
+              "description": "The unique ID of the test execution."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/automationScripts/{automationScriptId}",
+        "definition": {
+          "entityName": "AutomationScript",
+          "schema": {
+            "$ref": "#/backend/entities/AutomationScript"
+          },
+          "description": "Stores automation scripts associated with a specific project. Authorization is based on project ownership, derived from the path.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique ID of the user who owns the project."
+            },
+            {
+              "name": "projectId",
+              "description": "The unique ID of the project containing the automation script."
+            },
+            {
+              "name": "automationScriptId",
+              "description": "The unique ID of the automation script."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/tags/{tagId}",
+        "definition": {
+          "entityName": "Tag",
+          "schema": {
+            "$ref": "#/backend/entities/Tag"
+          },
+          "description": "Stores global tags that can be applied to test cases.",
+          "params": [
+            {
+              "name": "tagId",
+              "description": "The unique ID of the tag."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to prioritize authorization independence, clarity, and scalability. It leverages path-based ownership for user-related data and employs denormalization to avoid `get()` calls in security rules, thus ensuring atomic operations and simplifying debugging. The structure supports secure `list` operations through structural segregation, maintaining a homogeneous security posture within each collection.\n\nSpecifically, the `/users/{userId}` collection stores user profiles. Projects are stored in `/users/{userId}/projects/{projectId}`, establishing clear ownership and eliminating the need to check user roles during project access. Test cases, test executions, and automation scripts follow a similar pattern, residing under their respective projects (`/users/{userId}/projects/{projectId}/testCases/{testCaseId}`, `/users/{userId}/projects/{projectId}/testExecutions/{testExecutionId}`, and `/users/{userId}/projects/{projectId}/automationScripts/{automationScriptId}`), thereby ensuring that access to these resources is implicitly controlled by project ownership. Tags are stored globally under `/tags/{tagId}` since they are not user-specific and are intended to be shared across the application.\n\nThis design ensures Authorization Independence by nesting project-related data under the user's path, inherently linking project ownership to the user's ID.  QAPs are supported through segregation: the path structure itself enforces that only the owner can list projects they own, test cases they own, etc. There are no `get()` calls to a parent document needed to determine access; the path dictates authorization. Global tags don't require user-specific authorization, so are stored in a separate collection.\n\nThis structure avoids complex security rules and ensures data integrity by enforcing clear ownership and consistent access patterns."
+  }
+}

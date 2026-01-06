@@ -1,0 +1,216 @@
+/**
+ * This ruleset enforces a strict user-ownership security model for a QA testing application.
+ *
+ * Core Philosophy:
+ * All user-generated content, including projects, test cases, and test executions, is
+ * strictly siloed within that user's own data tree. Access is granted based on the user's
+ * authenticated UID matching the `{userId}` parameter in the document path. This path-based
+ * security strategy is fast, efficient, and easy to reason about.
+ *
+ * Data Structure:
+ * The data is organized hierarchically under a top-level `/users` collection. Each user's
+ * data, such as `/projects` and their nested content, resides under `/users/{userId}`.
+ * A separate top-level collection, `/tags`, stores global data that is not user-specific.
+ *
+ * Key Security Decisions:
+ * - User Isolation: Users can only access data within their own `/users/{userId}` path.
+ * - No User Listing: It is not possible for any client to list all users in the `/users` collection.
+ * - Relational Integrity: On document creation, key relational fields (e.g., a project's `userId`)
+ *   are validated to match the document's path, and these fields are made immutable on update.
+ * - Global Tags: The `/tags` collection is readable by any signed-in user, but client-side
+ *   writes are disabled to ensure they are managed centrally (e.g., via an admin SDK).
+ *
+ * Denormalization for Authorization:
+ * The data structure is designed to avoid slow and costly `get()` calls in rules. By nesting
+ * a user's projects under their own user path (e.g., `/users/{userId}/projects/{projectId}`),
+ * ownership is determined directly from the path, making authorization checks instantaneous.
+ * We also enforce that documents contain an internal owner ID that matches the path, ensuring
+ * data consistency.
+ *
+ * Structural Segregation:
+ * User-private data is structurally separated into the `/users/{userId}` tree. Publicly readable,
+ * global data is segregated into the top-level `/tags` collection. This separation allows for
+ * simple and secure list operations on each collection.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    //-------------------------------------------------------------------------
+    // Helper Functions
+    //-------------------------------------------------------------------------
+
+    /**
+     * Checks if the request is from a signed-in user.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the requesting user's UID matches the provided userId.
+     * This is the primary function for enforcing document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * A robust check for update/delete operations, ensuring the user is the
+     * owner AND the document they are trying to modify actually exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * Validates that the `userId` field within a new Project document
+     * matches the `userId` from the path.
+     */
+    function hasValidProjectOwnership(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * Ensures the `userId` field in a Project document cannot be changed.
+     */
+    function isProjectOwnershipImmutable() {
+      return request.resource.data.userId == resource.data.userId;
+    }
+
+    /**
+     * Validates relational integrity for a new TestCase.
+     * Ensures its internal projectId and createdBy fields are correctly set.
+     */
+    function hasValidTestCaseLinks(projectId) {
+      let data = request.resource.data;
+      return data.projectId == projectId && data.createdBy == request.auth.uid;
+    }
+
+    /**
+     * Ensures that the critical relational links on a TestCase are immutable.
+     */
+    function areTestCaseLinksImmutable() {
+      let incoming = request.resource.data;
+      let existing = resource.data;
+      return incoming.projectId == existing.projectId && incoming.createdBy == existing.createdBy;
+    }
+
+
+    //-------------------------------------------------------------------------
+    // User Profiles (/users/{userId})
+    //-------------------------------------------------------------------------
+
+    /**
+     * @description Users can create their own profile, and only they can read or write to it.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user creating their own document at `/users/USER_ID`.
+     * @deny (get) A user trying to read another user's document at `/users/OTHER_USER_ID`.
+     * @deny (list) Any user trying to list all documents in the `/users` collection.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      //-----------------------------------------------------------------------
+      // User Projects (/users/{userId}/projects/{projectId})
+      //-----------------------------------------------------------------------
+
+      /**
+       * @description A user can manage projects within their own user space.
+       * @path /users/{userId}/projects/{projectId}
+       * @allow (create) The user `USER_ID` creating a new project in their own subcollection.
+       * @deny (update) Any other user attempting to modify a project they do not own.
+       * @principle Enforces strict ownership for all project-related data via path nesting.
+       */
+      match /projects/{projectId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidProjectOwnership(userId);
+        allow update: if isExistingOwner(userId) && isProjectOwnershipImmutable();
+        allow delete: if isExistingOwner(userId);
+
+        //---------------------------------------------------------------------
+        // Test Cases (/users/{userId}/projects/{projectId}/testCases/{testCaseId})
+        //---------------------------------------------------------------------
+
+        /**
+         * @description A user can manage test cases within projects they own.
+         * @path /users/{userId}/projects/{projectId}/testCases/{testCaseId}
+         * @allow (list) The user `USER_ID` listing all test cases for a project they own.
+         * @deny (create) A user trying to create a test case in another user's project.
+         * @principle Inherits ownership from the parent user and project path. Validates relational integrity.
+         */
+        match /testCases/{testCaseId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId) && hasValidTestCaseLinks(projectId);
+          allow update: if isExistingOwner(userId) && areTestCaseLinksImmutable();
+          allow delete: if isExistingOwner(userId);
+        }
+
+        //---------------------------------------------------------------------
+        // Test Executions (/users/{userId}/projects/{projectId}/testExecutions/{testExecutionId})
+        //---------------------------------------------------------------------
+
+        /**
+         * @description A user can manage test executions for projects they own.
+         * @path /users/{userId}/projects/{projectId}/testExecutions/{testExecutionId}
+         * @allow (create) The user `USER_ID` adding a test execution to their own project.
+         * @deny (delete) Any other user trying to delete a test execution they do not own.
+         * @principle Inherits ownership from the parent user and project path.
+         */
+        match /testExecutions/{testExecutionId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
+
+        //---------------------------------------------------------------------
+        // Automation Scripts (/users/{userId}/projects/{projectId}/automationScripts/{automationScriptId})
+        //---------------------------------------------------------------------
+        
+        /**
+         * @description A user can manage automation scripts for projects they own.
+         * @path /users/{userId}/projects/{projectId}/automationScripts/{automationScriptId}
+         * @allow (get) The user `USER_ID` reading an automation script from their own project.
+         * @deny (create) Any other user trying to add a script to a project they do not own.
+         * @principle Inherits ownership from the parent user and project path.
+         */
+        match /automationScripts/{automationScriptId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    // Global Tags (/tags/{tagId})
+    //-------------------------------------------------------------------------
+
+    /**
+     * @description Global tags are readable by any authenticated user but cannot be modified by clients.
+     * @path /tags/{tagId}
+     * @allow (get, list) Any authenticated user can read tags.
+     * @deny (create, update, delete) All client-side writes are blocked to protect global data.
+     * @principle Segregates public-read data and protects it from unauthorized modification.
+     */
+    match /tags/{tagId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      // Writes are disallowed from the client. Tags should be managed via the Admin SDK.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
