@@ -46,4 +46,5 @@ export interface TestExecutionResult {
     status: 'Passed' | 'Failed' | 'Blocked' | 'Deferred' | "Can't Test";
     comments?: string;
     evidenceLinks?: string[];
+    evidenceFiles?: string[];
 }

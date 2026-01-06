@@ -28,7 +28,7 @@ import type { TestCase } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 
 const executionFormSchema = z.object({
   title: z.string().min(2, 'Title is required.'),
@@ -79,12 +79,16 @@ export default function NewExecutionPage() {
     }
   });
 
+  const { fields } = useFieldArray({
+    control: resultsForm.control,
+    name: 'executions',
+  });
+
   function onSelectTestCases(values: z.infer<typeof executionFormSchema>) {
     if (!testCases) return;
     const selected = testCases.filter(tc => values.testCaseIds.includes(tc.id));
     setSelectedTestCases(selected);
     
-    // Populate the second form
     resultsForm.reset({
         executions: selected.map(tc => ({
             testCaseId: tc.id,
@@ -109,13 +113,12 @@ export default function NewExecutionPage() {
       userId: user.uid,
       createdAt: serverTimestamp(),
       results: values.executions.map(ex => {
-        const links = ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : [];
-        const fileNames = ex.evidenceFiles ? Array.from(ex.evidenceFiles).map(file => file.name) : [];
         return {
           testCaseId: ex.testCaseId,
           status: ex.status,
-          comments: ex.comments,
-          evidenceLinks: [...links, ...fileNames],
+          comments: ex.comments || '',
+          evidenceLinks: ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : [],
+          evidenceFiles: ex.evidenceFiles ? Array.from(ex.evidenceFiles).map(file => file.name) : [],
         }
       }),
     };
@@ -234,9 +237,13 @@ export default function NewExecutionPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {selectedTestCases.map((tc, index) => (
-                                <TableRow key={tc.id}>
-                                    <TableCell className='font-medium'>{tc.title}</TableCell>
+                            {fields.map((field, index) => {
+                                const testCase = selectedTestCases.find(tc => tc.id === field.testCaseId);
+                                if (!testCase) return null;
+
+                                return (
+                                <TableRow key={field.id}>
+                                    <TableCell className='font-medium'>{testCase.title}</TableCell>
                                     <TableCell>
                                         <FormField
                                             control={resultsForm.control}
@@ -275,22 +282,28 @@ export default function NewExecutionPage() {
                                         />
                                     </TableCell>
                                     <TableCell className='space-y-2'>
+                                        <div className='flex items-center gap-1'>
                                          <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceLinks`}
                                             render={({ field }) => (
-                                                <FormItem>
+                                                <FormItem className='flex-1'>
                                                     <FormControl>
                                                         <Input placeholder="Paste URL (comma-separated)" {...field} />
                                                     </FormControl>
                                                 </FormItem>
                                             )}
                                         />
+                                        <Button size="icon" variant="ghost" type="button" onClick={() => resultsForm.setValue(`executions.${index}.evidenceLinks`, '')}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        </div>
+                                        <div className='flex items-center gap-1'>
                                         <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceFiles`}
-                                            render={({ field: { onChange, ...fieldProps} }) => (
-                                                <FormItem>
+                                            render={({ field: { onChange, value, ...fieldProps} }) => (
+                                                <FormItem className='flex-1'>
                                                     <FormControl>
                                                         <Input 
                                                             {...fieldProps}
@@ -302,9 +315,13 @@ export default function NewExecutionPage() {
                                                 </FormItem>
                                             )}
                                         />
+                                        <Button size="icon" variant="ghost" type="button" onClick={() => resultsForm.setValue(`executions.${index}.evidenceFiles`, undefined)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                            )})}
                         </TableBody>
                     </Table>
                     <div className="flex justify-end gap-2">
