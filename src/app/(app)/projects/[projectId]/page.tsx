@@ -38,7 +38,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 
 const chartConfig = {
@@ -55,11 +55,12 @@ const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' 
 
 const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags";
 
-export default function ProjectDetailsPage({ params }: { params: { projectId: string } }) {
+export default function ProjectDetailsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  const params = useParams() as { projectId: string };
   const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
 
   const projectRef = useMemoFirebase(() => {
