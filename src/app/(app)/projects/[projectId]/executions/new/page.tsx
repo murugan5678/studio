@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,9 @@ const executionResultsSchema = z.object({
 });
 
 
-export default function NewExecutionPage({ params }: { params: { projectId: string } }) {
+export default function NewExecutionPage() {
   const router = useRouter();
+  const params = useParams() as { projectId: string };
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
