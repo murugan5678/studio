@@ -27,7 +27,7 @@ export function Sidebar() {
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary">
             <AppLogo className="h-5 w-5 transition-all group-hover:scale-110" />
           </div>
-          <span className="font-headline text-xl font-bold text-primary">TestAI</span>
+          <span className="font-headline text-xl font-bold text-primary">QA Management</span>
         </Link>
         
         {navItems.map((item) => (

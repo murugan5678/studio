@@ -16,7 +16,7 @@ const fontSpaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'TestAI - AI Test Management',
+  title: 'QA Management - AI Test Management',
   description: 'An AI-powered platform to manage projects, test cases, and test execution.',
 };
 
