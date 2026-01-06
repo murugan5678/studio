@@ -3,13 +3,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, setDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, serverTimestamp, getDocs } from 'firebase/firestore';
-import type { Project, TestCase, TestExecutionRun, Defect, QualityGateConfig, DeploymentApproval, DeploymentApprovalHistory } from '@/lib/types';
+import type { Project, QualityGateConfig, DeploymentApproval, DeploymentApprovalHistory } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, X, ShieldCheck, Ban } from 'lucide-react';
+import { ArrowLeft, Check, X, ShieldCheck, Ban, HelpCircle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useMemo, useState, useEffect } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -31,10 +31,11 @@ const approvalSchema = z.object({
     comment: z.string().optional(),
 });
 
-const GateChecklistItem = ({ label, isMet }: { label: string; isMet: boolean | null }) => (
+const GateChecklistItem = ({ label, isMet, isLoading }: { label: string; isMet: boolean | null; isLoading: boolean }) => (
     <div className="flex items-center justify-between py-2">
       <span className="text-sm">{label}</span>
-      {isMet === null ? <Skeleton className="h-5 w-5 rounded-full" /> : 
+      {isLoading ? <Skeleton className="h-5 w-5 rounded-full" /> : 
+        isMet === null ? <HelpCircle className="h-5 w-5 text-gray-400" title="Metrics not available" /> :
         isMet ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-destructive" />
       }
     </div>
@@ -59,32 +60,6 @@ export default function QualityGateDetailsPage() {
     const { data: gateConfig, isLoading: isConfigLoading } = useDoc<QualityGateConfig>(gateConfigRef);
     const { data: approval, isLoading: isApprovalLoading } = useDoc<DeploymentApproval>(approvalRef);
 
-    const [aggregatedData, setAggregatedData] = useState<{ executions: TestExecutionRun[], defects: Defect[] } | null>(null);
-    const [isAggregatedDataLoading, setIsAggregatedDataLoading] = useState(true);
-
-    useEffect(() => {
-        if (!user || !firestore || !params.projectId) return;
-
-        const fetchData = async () => {
-            setIsAggregatedDataLoading(true);
-            const execQuery = query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`));
-            const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/defects`));
-
-            const [execSnap, defectSnap] = await Promise.all([
-                getDocs(execQuery),
-                getDocs(defectQuery),
-            ]);
-
-            const executions = execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun));
-            const defects = defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect));
-            
-            setAggregatedData({ executions, defects });
-            setIsAggregatedDataLoading(false);
-        }
-        fetchData();
-    }, [user, firestore, params.projectId])
-
-
     const form = useForm<z.infer<typeof qualityGateSchema>>({
         resolver: zodResolver(qualityGateSchema),
         defaultValues: { minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 },
@@ -98,45 +73,11 @@ export default function QualityGateDetailsPage() {
     useEffect(() => {
         if (gateConfig) {
             form.reset(gateConfig);
+        } else {
+             form.reset({ minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 });
         }
     }, [gateConfig, form]);
 
-    const projectMetrics = useMemo(() => {
-        if (!aggregatedData) return null;
-
-        const { executions, defects } = aggregatedData;
-        let passed = 0, totalExecuted = 0;
-        executions.forEach(run => {
-            run.results.forEach(res => { totalExecuted++; if (res.status === 'Passed') passed++; });
-        });
-
-        const openBugs = { critical: 0, high: 0, medium: 0 };
-        defects.forEach(d => {
-            if (d.status === 'Open') {
-                if (d.severity === 'Critical') openBugs.critical++;
-                if (d.severity === 'High') openBugs.high++;
-                if (d.severity === 'Medium') openBugs.medium++;
-            }
-        });
-
-        const passPercentage = totalExecuted > 0 ? (passed / totalExecuted) * 100 : 100;
-        return { passPercentage, openBugs };
-    }, [aggregatedData]);
-
-    const gateStatus = useMemo(() => {
-        if (!projectMetrics || isConfigLoading) return null;
-
-        const currentConfig = gateConfig ?? form.getValues();
-
-        const passRateMet = projectMetrics.passPercentage >= currentConfig.minPassPercentage;
-        const criticalBugsMet = projectMetrics.openBugs.critical <= currentConfig.maxCriticalBugs;
-        const highBugsMet = projectMetrics.openBugs.high <= currentConfig.maxHighBugs;
-        const mediumBugsMet = projectMetrics.openBugs.medium <= currentConfig.maxMediumBugs;
-
-        const allGatesPassed = passRateMet && criticalBugsMet && highBugsMet && mediumBugsMet;
-
-        return { passRateMet, criticalBugsMet, highBugsMet, mediumBugsMet, allGatesPassed };
-    }, [projectMetrics, gateConfig, isConfigLoading, form]);
 
     async function onSaveGate(values: z.infer<typeof qualityGateSchema>) {
         if (!gateConfigRef) return;
@@ -180,17 +121,21 @@ export default function QualityGateDetailsPage() {
         approvalForm.reset();
     }
 
-    const isLoading = isProjectLoading || isConfigLoading || isApprovalLoading || isAggregatedDataLoading;
+    const isLoading = isProjectLoading || isConfigLoading || isApprovalLoading;
 
     if (isLoading) return (
         <div className="space-y-6">
-            <Skeleton className="h-8 w-1/4" />
+            <Skeleton className="h-8 w-1/4 mb-4" />
+            <Skeleton className="h-10 w-48" />
             <div className="grid gap-6 lg:grid-cols-3">
                 <Card className="lg:col-span-2"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
                 <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
             </div>
         </div>
     );
+
+    // For now, we assume gates cannot be met until live data is re-integrated
+    const allGatesPassed = false; 
 
     return (
         <div className="space-y-6">
@@ -280,20 +225,20 @@ export default function QualityGateDetailsPage() {
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">Status:</span>
                                 {isApprovalLoading ? <Skeleton className="h-6 w-24" /> :
-                                <Badge variant={gateStatus?.allGatesPassed ? 'secondary' : 'destructive'}>
+                                <Badge variant={approval?.status === 'Approved for Deployment' ? 'secondary' : approval?.status === 'Blocked' ? 'destructive' : 'outline'}>
                                     {approval?.status ?? 'Not Ready'}
                                 </Badge>
                                 }
                             </div>
                         </CardHeader>
                         <CardContent className="divide-y">
-                            <GateChecklistItem label={`Test Pass Rate >= ${form.watch('minPassPercentage')}%`} isMet={gateStatus?.passRateMet ?? null} />
-                            <GateChecklistItem label={`Critical Bugs <= ${form.watch('maxCriticalBugs')}`} isMet={gateStatus?.criticalBugsMet ?? null} />
-                            <GateChecklistItem label={`High Bugs <= ${form.watch('maxHighBugs')}`} isMet={gateStatus?.highBugsMet ?? null} />
-                            <GateChecklistItem label={`Medium Bugs <= ${form.watch('maxMediumBugs')}`} isMet={gateStatus?.mediumBugsMet ?? null} />
+                            <GateChecklistItem label={`Test Pass Rate >= ${form.watch('minPassPercentage')}%`} isMet={null} isLoading={false} />
+                            <GateChecklistItem label={`Critical Bugs <= ${form.watch('maxCriticalBugs')}`} isMet={null} isLoading={false} />
+                            <GateChecklistItem label={`High Bugs <= ${form.watch('maxHighBugs')}`} isMet={null} isLoading={false} />
+                            <GateChecklistItem label={`Medium Bugs <= ${form.watch('maxMediumBugs')}`} isMet={null} isLoading={false} />
                         </CardContent>
                         <CardFooter className="flex-col gap-2 pt-4">
-                            <Button className="w-full" disabled={!gateStatus?.allGatesPassed || isApproving} onClick={() => { setApprovalAction('approve'); setIsDialogOpen(true); }}>
+                            <Button className="w-full" disabled={!allGatesPassed || isApproving} onClick={() => { setApprovalAction('approve'); setIsDialogOpen(true); }}>
                                 <ShieldCheck className="mr-2 h-4 w-4" /> Approve for Deployment
                             </Button>
                             <Button variant="destructive" className="w-full" disabled={isApproving} onClick={() => { setApprovalAction('block'); setIsDialogOpen(true); }}>
