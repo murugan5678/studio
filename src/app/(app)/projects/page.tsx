@@ -41,6 +41,7 @@ import {
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { Project } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 export default function ProjectsPage() {
   const { user } = useUser();
@@ -164,7 +165,11 @@ export default function ProjectsPage() {
               {!isLoading && projects && projects.length > 0 ? (
                 projects.map((project) => (
                   <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link href={`/projects/${project.id}`} className="hover:underline">
+                        {project.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{project.description}</TableCell>
                     <TableCell>
                       {project.createdAt?.toDate().toLocaleDateString()}
