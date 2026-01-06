@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import { PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
@@ -68,11 +68,11 @@ export default function ProjectsPage() {
     const fetchStatsForProjects = async () => {
       const enhancedProjects = await Promise.all(
         projects.map(async (project) => {
-          const testCasesRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`);
+          const testCasesQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
           const executionsRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`);
 
           const [testCasesSnap, executionsSnap] = await Promise.all([
-            getDocs(testCasesRef),
+            getDocs(testCasesQuery),
             getDocs(executionsRef)
           ]);
 
@@ -95,12 +95,12 @@ export default function ProjectsPage() {
           let status = "In Progress";
           let variant: ProjectWithStats['stats']['variant'] = 'secondary';
           
-          if (completion === 100) {
-            status = hasFailures ? 'Completed with Failures' : 'Completed';
-            variant = hasFailures ? 'destructive' : 'default';
-          } else if (totalTestCases > 0 && completion === 0) {
+          if (totalTestCases === 0) {
             status = 'Not Started';
             variant = 'outline';
+          } else if (completion === 100) {
+            status = hasFailures ? 'Completed with Failures' : 'Completed';
+            variant = hasFailures ? 'destructive' : 'default';
           }
 
           return {
