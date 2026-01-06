@@ -9,14 +9,14 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell } from 'recharts';
+import { useFirestore, useUser } from '@/firebase';
+import type { Project, TestExecutionRun } from '@/lib/types';
+import { useEffect, useState } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
 
-const chartData = [
-  { status: 'Passed', count: 1982, fill: 'hsl(var(--chart-2))' },
-  { status: 'Failed', count: 321, fill: 'hsl(var(--chart-1))' },
-  { status: 'Blocked', count: 45, fill: 'hsl(var(--chart-3))' },
-  { status: 'Deferred', count: 41, fill: 'hsl(var(--chart-4))' },
-  { status: "Can't Test", count: 20, fill: 'hsl(var(--chart-5))' },
-];
+interface OverviewChartProps {
+    projects: Project[];
+}
 
 const chartConfig = {
     count: {
@@ -42,9 +42,61 @@ const chartConfig = {
       label: "Can't Test",
       color: 'hsl(var(--chart-5))',
     },
-  };
+};
 
-export function OverviewChart() {
+type StatusCounts = {
+    [key: string]: number;
+}
+
+export function OverviewChart({ projects }: OverviewChartProps) {
+  const { user } = useUser();
+  const firestore = useFirestore();
+  const [chartData, setChartData] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user || !firestore || projects.length === 0) {
+        setChartData([]);
+        return;
+    };
+
+    const fetchExecutionData = async () => {
+        const statusCounts: StatusCounts = {
+            'Passed': 0,
+            'Failed': 0,
+            'Blocked': 0,
+            'Deferred': 0,
+            "Can't Test": 0,
+        };
+
+        const execPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`)));
+        const execSnapshots = await Promise.all(execPromises);
+
+        execSnapshots.forEach(snap => {
+            snap.forEach(doc => {
+                const run = doc.data() as TestExecutionRun;
+                run.results.forEach(result => {
+                    if (statusCounts.hasOwnProperty(result.status)) {
+                        statusCounts[result.status]++;
+                    }
+                });
+            });
+        });
+        
+        const dataForChart = Object.keys(chartConfig)
+            .filter(key => key !== 'count')
+            .map(status => ({
+                status,
+                count: statusCounts[status] || 0,
+                fill: chartConfig[status as keyof typeof chartConfig].color,
+            })).filter(item => item.count > 0);
+
+        setChartData(dataForChart);
+    };
+
+    fetchExecutionData();
+  }, [projects, user, firestore]);
+
+
   return (
     <Card className="xl:col-span-2">
       <CardHeader>

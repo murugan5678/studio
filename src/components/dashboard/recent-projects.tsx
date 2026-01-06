@@ -1,3 +1,4 @@
+'use client';
 import {
   Table,
   TableBody,
@@ -8,33 +9,12 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import type { Project } from '@/lib/types';
+import Link from 'next/link';
 
-const projects = [
-  {
-    name: 'Project Phoenix',
-    status: 'In Progress',
-    totalTests: 540,
-    completion: 75,
-  },
-  {
-    name: 'QuantumLeap CRM',
-    status: 'Completed',
-    totalTests: 1200,
-    completion: 100,
-  },
-  {
-    name: 'Nebula E-commerce',
-    status: 'On Hold',
-    totalTests: 350,
-    completion: 20,
-  },
-  {
-    name: 'Titan Analytics',
-    status: 'In Progress',
-    totalTests: 299,
-    completion: 90,
-  },
-];
+interface RecentProjectsProps {
+  projects: Project[];
+}
 
 const statusVariant: { [key: string]: 'secondary' | 'default' | 'outline' | 'destructive' } = {
     'In Progress': 'secondary',
@@ -42,7 +22,7 @@ const statusVariant: { [key: string]: 'secondary' | 'default' | 'outline' | 'des
     'On Hold': 'outline',
 }
 
-export function RecentProjects() {
+export function RecentProjects({ projects }: RecentProjectsProps) {
   return (
     <Card>
       <CardHeader>
@@ -55,24 +35,26 @@ export function RecentProjects() {
             <TableRow>
               <TableHead>Project</TableHead>
               <TableHead className="hidden sm:table-cell">Status</TableHead>
-              <TableHead className="text-right">Test Cases</TableHead>
+              <TableHead className="text-right">View</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {projects.map((project) => (
-              <TableRow key={project.name}>
+              <TableRow key={project.id}>
                 <TableCell>
                   <div className="font-medium">{project.name}</div>
                   <div className="hidden text-sm text-muted-foreground md:inline">
-                    {project.completion}% complete
+                    {project.description}
                   </div>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
-                  <Badge className="text-xs" variant={statusVariant[project.status] || 'default'}>
-                    {project.status}
+                  <Badge className="text-xs" variant={'secondary'}>
+                    In Progress
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">{project.totalTests}</TableCell>
+                <TableCell className="text-right">
+                  <Link href={`/projects/${project.id}`} className='text-sm hover:underline'>Details</Link>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

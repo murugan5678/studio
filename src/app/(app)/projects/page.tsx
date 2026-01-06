@@ -21,26 +21,25 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { collection, serverTimestamp, getDocs } from 'firebase/firestore';
 import { PlusCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { Project } from '@/lib/types';
+import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 
-
-// Mock data for status, will be replaced with real data
-const projectStats = [
-    { status: 'In Progress', totalTests: 540, completion: 75, variant: 'secondary' },
-    { status: 'Completed', totalTests: 1200, completion: 100, variant: 'default' },
-    { status: 'On Hold', totalTests: 350, completion: 20, variant: 'outline' },
-    { status: 'In Progress', totalTests: 299, completion: 90, variant: 'secondary' },
-    { status: 'Needs Review', totalTests: 80, completion: 45, variant: 'destructive' },
-];
+interface ProjectWithStats extends Project {
+  stats: {
+    totalTestCases: number;
+    completion: number;
+    status: string;
+    variant: 'secondary' | 'default' | 'outline' | 'destructive';
+  };
+}
 
 export default function ProjectsPage() {
   const { user } = useUser();
@@ -49,6 +48,7 @@ export default function ProjectsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
+  const [projectsWithStats, setProjectsWithStats] = useState<ProjectWithStats[]>([]);
 
   const projectsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -56,6 +56,59 @@ export default function ProjectsPage() {
   }, [user, firestore]);
 
   const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
+
+  useEffect(() => {
+    if (!projects || !user || !firestore) return;
+
+    const fetchStatsForProjects = async () => {
+      const enhancedProjects = await Promise.all(
+        projects.map(async (project) => {
+          const testCasesRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`);
+          const executionsRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`);
+
+          const testCasesSnap = await getDocs(testCasesRef);
+          const executionsSnap = await getDocs(executionsRef);
+
+          const totalTestCases = testCasesSnap.size;
+          const executedTestCaseIds = new Set<string>();
+
+          executionsSnap.forEach(doc => {
+            const run = doc.data() as TestExecutionRun;
+            run.results.forEach(result => {
+              executedTestCaseIds.add(result.testCaseId);
+            });
+          });
+
+          const completion = totalTestCases > 0 ? Math.round((executedTestCaseIds.size / totalTestCases) * 100) : 0;
+          
+          // Simplified status logic for now
+          let status = "In Progress";
+          let variant: ProjectWithStats['stats']['variant'] = 'secondary';
+          if (completion === 100) {
+            status = 'Completed';
+            variant = 'default';
+          } else if (completion === 0) {
+            status = 'Not Started';
+            variant = 'outline';
+          }
+
+          return {
+            ...project,
+            stats: {
+              totalTestCases,
+              completion,
+              status,
+              variant
+            },
+          };
+        })
+      );
+      setProjectsWithStats(enhancedProjects);
+    };
+
+    fetchStatsForProjects();
+  }, [projects, user, firestore]);
+
 
   const handleCreateProject = async () => {
     if (!user || !firestore || !newProjectName.trim()) return;
@@ -146,9 +199,9 @@ export default function ProjectsPage() {
             </Card>
         ))}
 
-        {!isLoading && projects && projects.length > 0 ? (
-          projects.map((project, index) => {
-            const stats = projectStats[index % projectStats.length]; // Cycle through mock data
+        {!isLoading && projectsWithStats && projectsWithStats.length > 0 ? (
+          projectsWithStats.map((project) => {
+            const { stats } = project;
             return (
               <Card key={project.id} className="flex flex-col">
                 <CardHeader>
@@ -156,13 +209,13 @@ export default function ProjectsPage() {
                     <Link href={`/projects/${project.id}`} className="hover:underline">
                       {project.name}
                     </Link>
-                    <Badge variant={stats.variant as any}>{stats.status}</Badge>
+                    <Badge variant={stats.variant}>{stats.status}</Badge>
                   </CardTitle>
                   <CardDescription className="line-clamp-2">{project.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
                     <div className="text-sm text-muted-foreground">
-                        <span className="font-bold text-foreground">{stats.totalTests}</span> Test Cases
+                        <span className="font-bold text-foreground">{stats.totalTestCases}</span> Test Cases
                     </div>
                     <div className="mt-2">
                         <Progress value={stats.completion} aria-label={`${stats.completion}% complete`} />

@@ -2,7 +2,7 @@
 
 import { useDoc, useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
 import { collection, doc } from 'firebase/firestore';
-import type { Project, TestCase } from '@/lib/types';
+import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -25,24 +25,6 @@ import {
 import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
 import Link from 'next/link';
 
-const kpiData = [
-    { title: "Total Test Cases", value: "2,389", icon: HelpCircle, color: "text-blue-500" },
-    { title: "Executed", value: "2030", icon: CheckCircle, color: "text-green-500" },
-    { title: "Passed", value: "1,982", icon: CheckCircle, color: "text-green-500" },
-    { title: "Failed", value: "48", icon: XCircle, color: "text-red-500" },
-    { title: "Deferred", value: "86", icon: PauseCircle, color: "text-gray-500" },
-    { title: "Completion", value: "85%", icon: CheckCircle, color: "text-indigo-500" },
-  ];
-
-const chartData = [
-  { date: 'Jan', passed: 150, failed: 10 },
-  { date: 'Feb', passed: 200, failed: 15 },
-  { date: 'Mar', passed: 180, failed: 25 },
-  { date: 'Apr', passed: 220, failed: 5 },
-  { date: 'May', passed: 250, failed: 12 },
-  { date: 'Jun', passed: 300, failed: 8 },
-];
-  
 const chartConfig = {
     passed: { label: 'Passed', color: 'hsl(var(--chart-2))' },
     failed: { label: 'Failed', color: 'hsl(var(--chart-1))' },
@@ -71,8 +53,14 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
   }, [user, firestore, params.projectId]);
 
+  const executionsQuery = useMemoFirebase(() => {
+    if(!user || !firestore) return null;
+    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
+  }, [user, firestore, params.projectId]);
+
   const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
+  const { data: executionRuns, isLoading: areExecutionsLoading } = useCollection<TestExecutionRun>(executionsQuery);
 
   const handleDownloadTemplate = () => {
     const csvContent = "data:text/csv;charset=utf-8," + TEST_CASE_CSV_HEADERS;
@@ -84,8 +72,68 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     link.click();
     document.body.removeChild(link);
   };
+  
+  const projectStats = useMemo(() => {
+    const totalTestCases = testCases?.length || 0;
+    let executedCount = 0;
+    const statusCounts = { Passed: 0, Failed: 0, Deferred: 0, 'Can\'t Test': 0, Blocked: 0 };
+    const executedTestCasesIds = new Set<string>();
 
-  if (isProjectLoading) {
+    executionRuns?.forEach(run => {
+        run.results.forEach(result => {
+            executedTestCasesIds.add(result.testCaseId);
+            if(statusCounts.hasOwnProperty(result.status)) {
+                statusCounts[result.status as keyof typeof statusCounts]++;
+            }
+        });
+    });
+
+    executedCount = executedTestCasesIds.size;
+    const completion = totalTestCases > 0 ? Math.round((executedCount / totalTestCases) * 100) : 0;
+
+    return {
+        totalTestCases,
+        executedCount,
+        passed: statusCounts.Passed,
+        failed: statusCounts.Failed,
+        deferred: statusCounts.Deferred,
+        cantTest: statusCounts['Can\'t Test'],
+        completion
+    }
+  }, [testCases, executionRuns]);
+
+  const kpiData = [
+    { title: "Total Test Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
+    { title: "Executed", value: projectStats.executedCount.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
+    { title: "Passed", value: projectStats.passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
+    { title: "Failed", value: projectStats.failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
+    { title: "Deferred", value: projectStats.deferred.toLocaleString(), icon: PauseCircle, color: "text-gray-500" },
+    { title: "Completion", value: `${projectStats.completion}%`, icon: CheckCircle, color: "text-indigo-500" },
+  ];
+
+  const chartData = useMemo(() => {
+    const monthlyData: {[key: string]: {passed: number, failed: number}} = {};
+    
+    executionRuns?.forEach(run => {
+        const date = run.createdAt.toDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        
+        if(!monthlyData[month]) {
+            monthlyData[month] = { passed: 0, failed: 0 };
+        }
+
+        run.results.forEach(result => {
+            if(result.status === 'Passed') monthlyData[month].passed++;
+            if(result.status === 'Failed') monthlyData[month].failed++;
+        })
+    });
+
+    return Object.entries(monthlyData).map(([date, counts]) => ({ date, ...counts }));
+
+  }, [executionRuns]);
+
+
+  if (isProjectLoading || areTestCasesLoading || areExecutionsLoading) {
     return (
         <div className="space-y-6">
             <Skeleton className="h-10 w-1/3" />
@@ -131,7 +179,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
       <Card>
         <CardHeader>
             <CardTitle>Execution Summary</CardTitle>
-            <CardDescription>Test results over the last 6 months for this project.</CardDescription>
+            <CardDescription>Test results over the last months for this project.</CardDescription>
         </CardHeader>
         <CardContent>
         <ChartContainer config={chartConfig} className="h-[250px] w-full">
