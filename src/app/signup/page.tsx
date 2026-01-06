@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -46,11 +46,12 @@ export default function SignupPage() {
     setIsLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, values.email, values.password);
+      await signOut(auth);
       toast({
         title: 'Account Created',
-        description: "You've been successfully signed up! Redirecting...",
+        description: "Your account has been created. Please log in.",
       });
-      router.push('/dashboard');
+      router.push('/login');
     } catch (error: any) {
       console.error('Signup error:', error);
       toast({
