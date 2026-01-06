@@ -38,6 +38,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 
 const chartConfig = {
@@ -58,6 +59,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
 
   const projectRef = useMemoFirebase(() => {
@@ -428,7 +430,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                             executionRuns.map(run => {
                                 const stats = getRunStats(run);
                                 return (
-                                    <TableRow key={run.id}>
+                                    <TableRow key={run.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/projects/${params.projectId}/executions/${run.id}`)}>
                                         <TableCell className="font-medium">{run.title}</TableCell>
                                         <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
                                         <TableCell>

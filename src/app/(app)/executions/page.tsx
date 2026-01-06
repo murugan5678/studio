@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface FullExecutionRun extends TestExecutionRun {
     projectName: string;
@@ -24,6 +25,7 @@ interface FullExecutionRun extends TestExecutionRun {
 export default function ExecutionsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
+    const router = useRouter();
     const [allRuns, setAllRuns] = useState<FullExecutionRun[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -125,10 +127,10 @@ export default function ExecutionsPage() {
                             allRuns.map(run => {
                                 const stats = getRunStats(run);
                                 return (
-                                    <TableRow key={run.id}>
+                                    <TableRow key={run.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/projects/${run.projectId}/executions/${run.id}`)}>
                                         <TableCell className="font-medium">{run.title}</TableCell>
                                         <TableCell>
-                                            <Link href={`/projects/${run.projectId}`} className="hover:underline">
+                                            <Link href={`/projects/${run.projectId}`} className="hover:underline" onClick={(e) => e.stopPropagation()}>
                                                 {run.projectName}
                                             </Link>
                                         </TableCell>
