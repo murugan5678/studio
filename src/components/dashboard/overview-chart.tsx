@@ -52,10 +52,12 @@ export function OverviewChart({ projects }: OverviewChartProps) {
   const { user } = useUser();
   const firestore = useFirestore();
   const [chartData, setChartData] = useState<any[]>([]);
+  const [totalExecutions, setTotalExecutions] = useState(0);
 
   useEffect(() => {
     if (!user || !firestore || projects.length === 0) {
         setChartData([]);
+        setTotalExecutions(0);
         return;
     };
 
@@ -67,6 +69,7 @@ export function OverviewChart({ projects }: OverviewChartProps) {
             'Deferred': 0,
             "Can't Test": 0,
         };
+        let total = 0;
 
         const execPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`)));
         const execSnapshots = await Promise.all(execPromises);
@@ -75,6 +78,7 @@ export function OverviewChart({ projects }: OverviewChartProps) {
             snap.forEach(doc => {
                 const run = doc.data() as TestExecutionRun;
                 run.results.forEach(result => {
+                    total++;
                     if (statusCounts.hasOwnProperty(result.status)) {
                         statusCounts[result.status]++;
                     }
@@ -91,6 +95,7 @@ export function OverviewChart({ projects }: OverviewChartProps) {
             })).filter(item => item.count > 0);
 
         setChartData(dataForChart);
+        setTotalExecutions(total);
     };
 
     fetchExecutionData();
@@ -104,20 +109,26 @@ export function OverviewChart({ projects }: OverviewChartProps) {
         <CardDescription>Aggregated test results across all projects</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
-          <PieChart>
-            <ChartTooltip content={<ChartTooltipContent nameKey="status" hideLabel />} />
-            <Pie data={chartData} dataKey="count" nameKey="status" innerRadius={60} strokeWidth={5}>
-              {chartData.map((entry) => (
-                <Cell key={`cell-${entry.status}`} fill={entry.fill} />
-              ))}
-            </Pie>
-            <ChartLegend
-              content={<ChartLegendContent nameKey="status" />}
-              className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
-            />
-          </PieChart>
-        </ChartContainer>
+        {totalExecutions > 0 ? (
+            <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[300px]">
+            <PieChart>
+                <ChartTooltip content={<ChartTooltipContent nameKey="status" hideLabel />} />
+                <Pie data={chartData} dataKey="count" nameKey="status" innerRadius={60} strokeWidth={5}>
+                {chartData.map((entry) => (
+                    <Cell key={`cell-${entry.status}`} fill={entry.fill} />
+                ))}
+                </Pie>
+                <ChartLegend
+                content={<ChartLegendContent nameKey="status" />}
+                className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                />
+            </PieChart>
+            </ChartContainer>
+        ) : (
+            <div className="flex h-[300px] w-full items-center justify-center text-center">
+                <p className="text-muted-foreground">No execution data available yet.</p>
+            </div>
+        )}
       </CardContent>
     </Card>
   );
