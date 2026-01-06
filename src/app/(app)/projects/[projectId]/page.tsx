@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2, Ban, ShieldAlert, Bug } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2, Ban, ShieldAlert, Bug, ArrowLeft } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -258,6 +258,12 @@ const projectStats = useMemo(() => {
 
   return (
     <div className="space-y-6">
+       <div className='flex justify-start'>
+          <Button variant="outline" onClick={() => router.push('/projects')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Projects
+          </Button>
+       </div>
       <div>
         <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
         <p className="text-muted-foreground">{project.description}</p>
