@@ -1,8 +1,8 @@
 'use client';
 
-import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
-import type { Project } from '@/lib/types';
+import { useDoc, useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
+import { collection, doc } from 'firebase/firestore';
+import type { Project, TestCase } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,6 +23,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
+import Link from 'next/link';
 
 const kpiData = [
     { title: "Total Test Cases", value: "2,389", icon: HelpCircle, color: "text-blue-500" },
@@ -47,6 +48,13 @@ const chartConfig = {
     failed: { label: 'Failed', color: 'hsl(var(--chart-1))' },
 };
 
+const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
+  Low: 'outline',
+  Medium: 'secondary',
+  High: 'default',
+  Critical: 'destructive',
+};
+
 export default function ProjectDetailsPage({ params }: { params: { projectId: string } }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -56,9 +64,15 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     return doc(firestore, `users/${user.uid}/projects`, params.projectId);
   }, [user, firestore, params.projectId]);
 
-  const { data: project, isLoading } = useDoc<Project>(projectRef);
+  const testCasesQuery = useMemoFirebase(() => {
+    if(!user || !firestore) return null;
+    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
+  }, [user, firestore, params.projectId]);
 
-  if (isLoading) {
+  const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
+  const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
+
+  if (isProjectLoading) {
     return (
         <div className="space-y-6">
             <Skeleton className="h-10 w-1/3" />
@@ -136,7 +150,11 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
             </TabsList>
             <div className='flex items-center gap-2'>
                 <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button>
-                <Button><PlusCircle className="mr-2 h-4 w-4" /> New Test Case</Button>
+                <Button asChild>
+                    <Link href={`/projects/${params.projectId}/new-test-case`}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> New Test Case
+                    </Link>
+                </Button>
             </div>
         </div>
         <TabsContent value="test-cases">
@@ -153,16 +171,38 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                                 <TableHead>Title</TableHead>
                                 <TableHead>Module</TableHead>
                                 <TableHead>Priority</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead>Type</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                           {/* Placeholder for test cases */}
-                           <TableRow>
+                           {areTestCasesLoading && (
+                            <TableRow>
                                 <TableCell colSpan={5} className="h-24 text-center">
-                                    No test cases yet. Start by creating one.
+                                    Loading test cases...
                                 </TableCell>
-                           </TableRow>
+                            </TableRow>
+                           )}
+                           {!areTestCasesLoading && testCases && testCases.length > 0 ? (
+                                testCases.map(tc => (
+                                    <TableRow key={tc.id}>
+                                        <TableCell className='font-mono text-xs'>{tc.id.substring(0, 8)}...</TableCell>
+                                        <TableCell className='font-medium'>{tc.title}</TableCell>
+                                        <TableCell>{tc.module}</TableCell>
+                                        <TableCell>
+                                            <Badge variant={priorityVariant[tc.priority]}>{tc.priority}</Badge>
+                                        </TableCell>
+                                        <TableCell>{tc.type}</TableCell>
+                                    </TableRow>
+                                ))
+                           ) : (
+                            !areTestCasesLoading && (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center">
+                                        No test cases yet. Start by creating one.
+                                    </TableCell>
+                                </TableRow>
+                            )
+                           )}
                         </TableBody>
                     </Table>
                 </CardContent>
