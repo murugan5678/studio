@@ -53,6 +53,16 @@ const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' 
   Critical: 'destructive',
 };
 
+const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
+    Passed: 'default',
+    Failed: 'destructive',
+    Blocked: 'outline',
+    Deferred: 'outline',
+    "Can't Test": 'outline'
+};
+statusVariant.Passed = 'secondary';
+statusVariant.Failed = 'destructive';
+
 const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags,ticketUrl";
 
 export default function ProjectDetailsPage() {
@@ -326,7 +336,7 @@ export default function ProjectDetailsPage() {
                             <TableRow>
                                 <TableHead className="w-[40px]">
                                 <Checkbox
-                                    checked={isAllSelected}
+                                    checked={selectedTestCases.length > 0 && selectedTestCases.length === allTestCaseIds.length}
                                     onCheckedChange={(value) => {
                                       if (value) {
                                         setSelectedTestCases(allTestCaseIds);
@@ -335,7 +345,7 @@ export default function ProjectDetailsPage() {
                                       }
                                     }}
                                     aria-label="Select all"
-                                    data-indeterminate={isSomeSelected}
+                                    data-indeterminate={selectedTestCases.length > 0 && selectedTestCases.length < allTestCaseIds.length}
                                   />
                                 </TableHead>
                                 <TableHead>ID</TableHead>

@@ -78,11 +78,15 @@ export default function ProjectsPage() {
 
           const totalTestCases = testCasesSnap.size;
           const executedTestCaseIds = new Set<string>();
+          let hasFailures = false;
 
           executionsSnap.forEach(doc => {
             const run = doc.data() as TestExecutionRun;
             run.results.forEach(result => {
               executedTestCaseIds.add(result.testCaseId);
+              if (result.status === 'Failed') {
+                hasFailures = true;
+              }
             });
           });
 
@@ -90,9 +94,10 @@ export default function ProjectsPage() {
           
           let status = "In Progress";
           let variant: ProjectWithStats['stats']['variant'] = 'secondary';
+          
           if (completion === 100) {
-            status = 'Completed';
-            variant = 'default';
+            status = hasFailures ? 'Completed with Failures' : 'Completed';
+            variant = hasFailures ? 'destructive' : 'default';
           } else if (totalTestCases > 0 && completion === 0) {
             status = 'Not Started';
             variant = 'outline';
@@ -212,7 +217,7 @@ export default function ProjectsPage() {
           projectsWithStats.map((project) => {
             const { stats } = project;
             return (
-              <Card key={project.id} className="flex flex-col">
+              <Card key={project.id} className="flex flex-col hover:shadow-lg transition-shadow duration-300">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     <Link href={`/projects/${project.id}`} className="hover:underline">
