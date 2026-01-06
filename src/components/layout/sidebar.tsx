@@ -18,7 +18,7 @@ export function Sidebar() {
     const pathname = usePathname();
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-10 hidden w-60 flex-col border-r bg-background sm:flex">
+    <aside className="fixed inset-y-0 left-0 z-10 hidden w-60 flex-col border-r bg-sidebar text-sidebar-foreground sm:flex">
       <nav className="flex flex-col gap-4 px-4 sm:py-5">
         <Link
           href="/dashboard"
@@ -36,7 +36,7 @@ export function Sidebar() {
                 href={item.href}
                 className={cn("flex items-center gap-3 rounded-lg px-3 py-2 transition-all", 
                 pathname.startsWith(item.href) 
-                ? 'bg-accent text-accent-foreground' 
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
                 : 'text-muted-foreground hover:text-foreground'
                 )}
             >
@@ -50,7 +50,7 @@ export function Sidebar() {
                 href="/settings"
                 className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-all", 
                 pathname === '/settings' 
-                ? 'bg-accent text-accent-foreground' 
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground' 
                 : 'text-muted-foreground hover:text-foreground'
                 )}
             >
