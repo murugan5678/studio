@@ -66,7 +66,7 @@ export function OverviewChart({ projects }: OverviewChartProps) {
     };
     let total = 0;
 
-    userExecutions.forEach(run => {
+    (userExecutions || []).forEach(run => {
         run.results.forEach(result => {
             total++;
             if (statusCounts.hasOwnProperty(result.status)) {

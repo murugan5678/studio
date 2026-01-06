@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2 } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2, Ban, ShieldAlert } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -101,29 +101,25 @@ export default function ProjectDetailsPage() {
   
   const projectStats = useMemo(() => {
     const totalTestCases = testCases?.length || 0;
-    let executedCount = 0;
-    const statusCounts = { Passed: 0, Failed: 0, Deferred: 0, 'Can\'t Test': 0, Blocked: 0 };
-    const executedTestCasesIds = new Set<string>();
+    const statusCounts: { [key: string]: number } = { 'Passed': 0, 'Failed': 0, 'Blocked': 0, 'Deferred': 0, 'Can\'t Test': 0 };
+    const executedTestCaseIds = new Set<string>();
 
-    executionRuns?.forEach(run => {
+    (executionRuns || []).forEach(run => {
         run.results.forEach(result => {
-            executedTestCasesIds.add(result.testCaseId);
+            executedTestCaseIds.add(result.testCaseId);
             if(statusCounts.hasOwnProperty(result.status)) {
                 statusCounts[result.status as keyof typeof statusCounts]++;
             }
         });
     });
 
-    executedCount = executedTestCasesIds.size;
+    const executedCount = executedTestCaseIds.size;
     const completion = totalTestCases > 0 ? Math.round((executedCount / totalTestCases) * 100) : 0;
 
     return {
         totalTestCases,
         executedCount,
-        passed: statusCounts.Passed,
-        failed: statusCounts.Failed,
-        deferred: statusCounts.Deferred,
-        cantTest: statusCounts['Can\'t Test'],
+        ...statusCounts,
         completion
     }
   }, [testCases, executionRuns]);
@@ -162,12 +158,12 @@ export default function ProjectDetailsPage() {
   };
 
   const kpiData = [
-    { title: "Total Test Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
-    { title: "Executed", value: projectStats.executedCount.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
-    { title: "Passed", value: projectStats.passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
-    { title: "Failed", value: projectStats.failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
-    { title: "Deferred", value: projectStats.deferred.toLocaleString(), icon: PauseCircle, color: "text-gray-500" },
-    { title: "Completion", value: `${projectStats.completion}%`, icon: CheckCircle, color: "text-indigo-500" },
+    { title: "Total Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
+    { title: "Passed", value: projectStats.Passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
+    { title: "Failed", value: projectStats.Failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
+    { title: "Blocked", value: projectStats.Blocked.toLocaleString(), icon: Ban, color: "text-yellow-500" },
+    { title: "Deferred", value: projectStats.Deferred.toLocaleString(), icon: PauseCircle, color: "text-gray-500" },
+    { title: "Can't Test", value: projectStats['Can\'t Test'].toLocaleString(), icon: ShieldAlert, color: "text-orange-500" },
   ];
 
   const chartData = useMemo(() => {
