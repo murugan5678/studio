@@ -55,6 +55,7 @@ export interface TestExecutionResult {
     comments?: string;
     evidenceLinks?: string[];
     evidenceFiles?: string[];
+    bugLink?: string;
 }
 
 export interface Defect {

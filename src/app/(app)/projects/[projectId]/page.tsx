@@ -356,12 +356,13 @@ export default function ProjectDetailsPage() {
                                 <TableHead>Team</TableHead>
                                 <TableHead>Automation</TableHead>
                                 <TableHead>Type</TableHead>
+                                <TableHead>Ticket</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                            {areTestCasesLoading && (
                             <TableRow>
-                                <TableCell colSpan={9} className="h-24 text-center">
+                                <TableCell colSpan={10} className="h-24 text-center">
                                     Loading test cases...
                                 </TableCell>
                             </TableRow>
@@ -387,14 +388,7 @@ export default function ProjectDetailsPage() {
                                             {tc.id}
                                           </Link>
                                         </TableCell>
-                                        <TableCell className='font-medium flex items-center gap-2'>
-                                          {tc.title}
-                                          {tc.ticketUrl && (
-                                            <a href={tc.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                                              <Link2 className="h-4 w-4" />
-                                            </a>
-                                          )}
-                                          </TableCell>
+                                        <TableCell className='font-medium'>{tc.title}</TableCell>
                                         <TableCell>{tc.module}</TableCell>
                                         <TableCell>
                                             <Badge variant={priorityVariant[tc.priority]}>{tc.priority}</Badge>
@@ -407,12 +401,19 @@ export default function ProjectDetailsPage() {
                                           </Badge>
                                         </TableCell>
                                         <TableCell>{tc.type}</TableCell>
+                                        <TableCell>
+                                          {tc.ticketUrl && (
+                                            <a href={tc.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                              <Link2 className="h-4 w-4" />
+                                            </a>
+                                          )}
+                                        </TableCell>
                                     </TableRow>
                                 ))
                            ) : (
                             !areTestCasesLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-24 text-center">
+                                    <TableCell colSpan={10} className="h-24 text-center">
                                         No test cases yet. Start by creating one.
                                     </TableCell>
                                 </TableRow>

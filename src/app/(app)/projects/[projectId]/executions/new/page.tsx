@@ -44,6 +44,7 @@ const executionResultsSchema = z.object({
       comments: z.string().optional(),
       evidenceLinks: z.string().optional(), // For URLs
       evidenceDataUris: z.array(z.string()).optional(), // For file previews
+      bugLink: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
     })
   ),
 });
@@ -125,6 +126,7 @@ export default function NewExecutionPage() {
             comments: '',
             evidenceLinks: '',
             evidenceDataUris: [],
+            bugLink: '',
         }))
     });
 
@@ -151,6 +153,7 @@ export default function NewExecutionPage() {
           comments: ex.comments || '',
           evidenceLinks: allLinks,
           evidenceFiles: [], // Deprecating direct file handling for now in favor of data URIs
+          bugLink: ex.bugLink || '',
         }
       }),
     };
@@ -296,10 +299,11 @@ export default function NewExecutionPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className='w-[25%]'>Test Case</TableHead>
+                                <TableHead className='w-[20%]'>Test Case</TableHead>
                                 <TableHead className='w-[15%]'>Status</TableHead>
                                 <TableHead className='w-[20%]'>Comments</TableHead>
-                                <TableHead className='w-[40%]'>Evidence</TableHead>
+                                <TableHead className='w-[25%]'>Evidence</TableHead>
+                                <TableHead className='w-[20%]'>Bug/Ticket Link</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -349,7 +353,7 @@ export default function NewExecutionPage() {
                                             )}
                                         />
                                     </TableCell>
-                                    <TableCell className='space-y-2'>
+                                    <TableCell className='space-y-2 align-top'>
                                         <div className='flex items-start gap-1'>
                                          <FormField
                                             control={resultsForm.control}
@@ -402,6 +406,20 @@ export default function NewExecutionPage() {
                                                 ))}
                                             </div>
                                         )}
+                                    </TableCell>
+                                     <TableCell>
+                                         <FormField
+                                            control={resultsForm.control}
+                                            name={`executions.${index}.bugLink`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input placeholder="https://jira.example.com/browse/BUG-456" {...field} value={field.value || ''} />
+                                                    </FormControl>
+                                                     <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
                                     </TableCell>
                                 </TableRow>
                             )})}
