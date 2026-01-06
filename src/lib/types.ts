@@ -29,5 +29,6 @@ export interface TestCase {
     testData?: string;
     createdBy: string;
     createdAt: Timestamp;
+    updatedAt?: Timestamp;
   }
   

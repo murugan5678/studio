@@ -192,7 +192,11 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                            {!areTestCasesLoading && testCases && testCases.length > 0 ? (
                                 testCases.map(tc => (
                                     <TableRow key={tc.id}>
-                                        <TableCell className='font-mono text-xs'>{tc.id.substring(0, 8)}...</TableCell>
+                                        <TableCell>
+                                          <Link href={`/projects/${params.projectId}/test-cases/${tc.id}/edit`} className='font-mono text-xs hover:underline'>
+                                            {tc.id.substring(0, 8)}...
+                                          </Link>
+                                        </TableCell>
                                         <TableCell className='font-medium'>{tc.title}</TableCell>
                                         <TableCell>{tc.module}</TableCell>
                                         <TableCell>
