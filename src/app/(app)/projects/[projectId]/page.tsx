@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, Bot, PlayCircle } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, Bot, PlayCircle, Download } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -55,6 +55,8 @@ const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' 
   Critical: 'destructive',
 };
 
+const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags";
+
 export default function ProjectDetailsPage({ params }: { params: { projectId: string } }) {
   const { user } = useUser();
   const firestore = useFirestore();
@@ -71,6 +73,17 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
 
   const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
+
+  const handleDownloadTemplate = () => {
+    const csvContent = "data:text/csv;charset=utf-8," + TEST_CASE_CSV_HEADERS;
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "testcase_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (isProjectLoading) {
     return (
@@ -149,6 +162,14 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                 <TabsTrigger value="executions">Test Execution</TabsTrigger>
             </TabsList>
             <div className='flex items-center gap-2'>
+                <Button asChild variant="outline">
+                    <Link href={`/projects/${params.projectId}/upload-test-cases`}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload Cases
+                    </Link>
+                </Button>
+                 <Button variant="outline" onClick={handleDownloadTemplate}>
+                    <Download className="mr-2 h-4 w-4" /> Download Template
+                </Button>
                  <Button asChild variant="outline">
                     <Link href={`/projects/${params.projectId}/ai-script-generator`}>
                         <Bot className="mr-2 h-4 w-4" /> AI Script Generator

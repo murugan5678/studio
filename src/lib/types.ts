@@ -32,3 +32,19 @@ export interface TestCase {
     updatedAt?: Timestamp;
   }
   
+export interface TestExecutionRun {
+    id: string;
+    projectId: string;
+    title: string;
+    createdAt: Timestamp;
+    userId: string;
+    results: TestExecutionResult[];
+}
+
+export interface TestExecutionResult {
+    testCaseId: string;
+    status: 'Passed' | 'Failed' | 'Blocked' | 'Deferred' | "Can't Test";
+    comments?: string;
+    evidence?: string;
+}
+
