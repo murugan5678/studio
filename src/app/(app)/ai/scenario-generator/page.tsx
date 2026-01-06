@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, writeBatch, doc } from 'firebase/firestore';
+import { collection, serverTimestamp, writeBatch, doc, getDocs } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Lightbulb, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Lightbulb, Loader2 } from 'lucide-react';
 import { generateTestScenarios, type GenerateTestScenariosOutput } from '@/ai/flows/ai-test-scenario-generation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Project } from '@/lib/types';
@@ -32,7 +30,6 @@ const formSchema = z.object({
   path: ['textInput'],
 });
 
-type GeneratedTestCase = GenerateTestScenariosOutput['testCases'][0];
 type GenerateTestScenariosInput = { inputData: string };
 
 function fileToDataUri(file: File): Promise<string> {
@@ -98,11 +95,11 @@ export default function AiScenarioGeneratorPage() {
             
             const newTestCase = {
                 ...tc,
-                id: docRef.id,
+                id: testCaseId,
                 projectId: projectId,
                 createdBy: user.uid,
                 createdAt: serverTimestamp(),
-                testSteps: Array.isArray(tc.testSteps) ? tc.testSteps.join('\\n') : tc.testSteps,
+                testSteps: Array.isArray(tc.testSteps) ? tc.testSteps.join('\n') : tc.testSteps,
                 tags: Array.isArray(tc.tags) ? tc.tags : [],
                 status: 'Pending',
             };
@@ -216,5 +213,3 @@ export default function AiScenarioGeneratorPage() {
     </div>
   );
 }
-
-    
