@@ -9,11 +9,12 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell } from 'recharts';
-import type { TestExecutionRun } from '@/lib/types';
+import type { TestCase, TestExecutionResult } from '@/lib/types';
 import { useMemo } from 'react';
 
 interface OverviewChartProps {
-    executions: TestExecutionRun[];
+    testCases: TestCase[];
+    latestResults: Map<string, TestExecutionResult>;
 }
 
 const chartConfig = {
@@ -40,23 +41,28 @@ const chartConfig = {
       label: "Can't Test",
       color: 'hsl(var(--chart-5))',
     },
+    'NotRun': {
+        label: 'Not Run',
+        color: 'hsl(var(--muted))'
+    }
 };
 
-export function OverviewChart({ executions }: OverviewChartProps) {
+export function OverviewChart({ testCases, latestResults }: OverviewChartProps) {
   
   const { chartData, totalExecutions } = useMemo(() => {
     const statusCounts: { [key: string]: number } = {
-        'Passed': 0, 'Failed': 0, 'Blocked': 0, 'Deferred': 0, "Can't Test": 0,
+        Passed: 0, Failed: 0, Blocked: 0, Deferred: 0, "Can't Test": 0, NotRun: 0
     };
-    let total = 0;
-
-    (executions || []).forEach(run => {
-        run.results.forEach(result => {
-            total++;
-            if (statusCounts.hasOwnProperty(result.status)) {
-                statusCounts[result.status]++;
+    
+    (testCases || []).forEach(tc => {
+        const latestResult = latestResults.get(tc.id);
+        if (latestResult) {
+            if (statusCounts.hasOwnProperty(latestResult.status)) {
+                statusCounts[latestResult.status]++;
             }
-        });
+        } else {
+            statusCounts.NotRun++;
+        }
     });
     
     const dataForChart = Object.keys(chartConfig)
@@ -67,8 +73,8 @@ export function OverviewChart({ executions }: OverviewChartProps) {
             fill: chartConfig[status as keyof typeof chartConfig].color,
         })).filter(item => item.count > 0);
 
-    return { chartData: dataForChart, totalExecutions: total };
-  }, [executions]);
+    return { chartData: dataForChart, totalExecutions: testCases.length };
+  }, [testCases, latestResults]);
 
 
   return (

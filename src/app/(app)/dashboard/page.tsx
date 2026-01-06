@@ -3,7 +3,7 @@ import { KpiCards } from '@/components/dashboard/kpi-cards';
 import { OverviewChart } from '@/components/dashboard/overview-chart';
 import { RecentProjects } from '@/components/dashboard/recent-projects';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, Timestamp, where } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun, TestExecutionResult } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState, useMemo } from 'react';
@@ -41,7 +41,7 @@ export default function DashboardPage() {
 
         setIsDataLoading(true);
         const fetchAllData = async () => {
-            const testCasesPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testCases`)));
+            const testCasesPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testCases`), where('status', '==', 'Approved'))));
             const executionsPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`), orderBy('createdAt', 'desc'))));
 
             const testCasesSnaps = await Promise.all(testCasesPromises);
@@ -115,7 +115,7 @@ export default function DashboardPage() {
                 />
             </div>
             <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
-                <OverviewChart executions={allProjectsData.executions} />
+                <OverviewChart testCases={allProjectsData.testCases} latestResults={allProjectsData.latestResults} />
                 <RecentProjects projects={recentProjects || []}/>
             </div>
         </>

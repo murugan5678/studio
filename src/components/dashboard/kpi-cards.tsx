@@ -18,13 +18,16 @@ export function KpiCards({ projects, testCases, latestResults }: KpiCardsProps) 
     let passed = 0;
     let failed = 0;
     
-    latestResults.forEach(result => {
-        if (result.status === 'Passed') passed++;
-        if (result.status === 'Failed') failed++;
+    (testCases || []).forEach(tc => {
+        const latestResult = latestResults.get(tc.id);
+        if (latestResult) {
+            if (latestResult.status === 'Passed') passed++;
+            else if (latestResult.status === 'Failed') failed++;
+        }
     });
 
     return { passed, failed };
-  }, [latestResults]);
+  }, [testCases, latestResults]);
 
 
   const kpiData = [
