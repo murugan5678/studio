@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, serverTimestamp } from 'firebase/firestore';
-import type { TestCase } from '@/lib/types';
+import type { TestCase, TestExecutionRun } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -61,7 +61,7 @@ function fileToDataUri(file: File): Promise<string> {
 
 export default function NewExecutionPage() {
   const router = useRouter();
-  const params = useParams() as { projectId: string };
+  const params = useParams();
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
@@ -77,14 +77,29 @@ export default function NewExecutionPage() {
   }, [user, firestore, params.projectId]);
 
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
+  
+  const executionsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
+  }, [user, firestore, params.projectId]);
+  
+  const { data: executionRuns } = useCollection<TestExecutionRun>(executionsQuery);
 
   const executionForm = useForm<z.infer<typeof executionFormSchema>>({
     resolver: zodResolver(executionFormSchema),
     defaultValues: {
-      title: `Execution Run - ${new Date().toLocaleDateString()}`,
+      title: '',
       testCaseIds: [],
     },
   });
+
+  useEffect(() => {
+    if (executionRuns !== undefined) {
+      const nextRunNumber = (executionRuns?.length || 0) + 1;
+      executionForm.setValue('title', `ER${String(nextRunNumber).padStart(3, '0')}`);
+    }
+  }, [executionRuns, executionForm]);
+
 
   const resultsForm = useForm<z.infer<typeof executionResultsSchema>>({
     resolver: zodResolver(executionResultsSchema),
