@@ -5,17 +5,10 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Dialog,
   DialogContent,
@@ -28,20 +21,26 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { collection, serverTimestamp } from 'firebase/firestore';
+import { PlusCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import type { Project } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+
+
+// Mock data for status, will be replaced with real data
+const projectStats = [
+    { status: 'In Progress', totalTests: 540, completion: 75, variant: 'secondary' },
+    { status: 'Completed', totalTests: 1200, completion: 100, variant: 'default' },
+    { status: 'On Hold', totalTests: 350, completion: 20, variant: 'outline' },
+    { status: 'In Progress', totalTests: 299, completion: 90, variant: 'secondary' },
+    { status: 'Needs Review', totalTests: 80, completion: 45, variant: 'destructive' },
+];
 
 export default function ProjectsPage() {
   const { user } = useUser();
@@ -79,8 +78,8 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Projects</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -129,80 +128,68 @@ export default function ProjectsPage() {
           </DialogContent>
         </Dialog>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Projects</CardTitle>
-          <CardDescription>
-            A list of all projects associated with your account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Created At</TableHead>
-                <TableHead>
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && (
-                <>
-                    <TableRow>
-                        <TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                    <TableRow>
-                        <TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell>
-                    </TableRow>
-                </>
-              )}
-              {!isLoading && projects && projects.length > 0 ? (
-                projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">
-                      <Link href={`/projects/${project.id}`} className="hover:underline">
-                        {project.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{project.description}</TableCell>
-                    <TableCell>
-                      {project.createdAt?.toDate().toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit</DropdownMenuItem>
-                          <DropdownMenuItem>Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                !isLoading && (
-                    <TableRow>
-                    <TableCell colSpan={4} className="text-center">
-                        No projects found.
-                    </TableCell>
-                    </TableRow>
-                )
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {isLoading && Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+                <CardHeader>
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full mt-2" />
+                </CardContent>
+                <CardFooter>
+                     <Skeleton className="h-8 w-full" />
+                </CardFooter>
+            </Card>
+        ))}
+
+        {!isLoading && projects && projects.length > 0 ? (
+          projects.map((project, index) => {
+            const stats = projectStats[index % projectStats.length]; // Cycle through mock data
+            return (
+              <Card key={project.id} className="flex flex-col">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <Link href={`/projects/${project.id}`} className="hover:underline">
+                      {project.name}
+                    </Link>
+                    <Badge variant={stats.variant as any}>{stats.status}</Badge>
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2">{project.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                    <div className="text-sm text-muted-foreground">
+                        <span className="font-bold text-foreground">{stats.totalTests}</span> Test Cases
+                    </div>
+                    <div className="mt-2">
+                        <Progress value={stats.completion} aria-label={`${stats.completion}% complete`} />
+                        <p className="text-xs text-muted-foreground mt-1">{stats.completion}% complete</p>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button asChild className="w-full">
+                        <Link href={`/projects/${project.id}`}>View Dashboard</Link>
+                    </Button>
+                </CardFooter>
+              </Card>
+            )
+        })
+        ) : (
+          !isLoading && (
+            <div className="col-span-full text-center py-12">
+              <h3 className="text-xl font-semibold">No projects yet</h3>
+              <p className="text-muted-foreground mb-4">Get started by creating your first project.</p>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Create Project
+              </Button>
+            </div>
+          )
+        )}
+      </div>
     </>
   );
 }
