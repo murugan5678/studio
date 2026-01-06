@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -27,8 +27,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, serverTimestamp, doc, getDocs } from 'firebase/firestore';
 import { ArrowLeft } from 'lucide-react';
 
 const formSchema = z.object({
@@ -50,8 +50,9 @@ const formSchema = z.object({
   tags: z.string().optional(),
 });
 
-export default function NewTestCasePage({ params }: { params: { projectId: string } }) {
+export default function NewTestCasePage() {
   const router = useRouter();
+  const params = useParams() as { projectId: string };
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
@@ -88,21 +89,29 @@ export default function NewTestCasePage({ params }: { params: { projectId: strin
       return;
     }
 
-    const testCaseData = {
-      ...values,
-      projectId: params.projectId,
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-      tags: values.tags?.split(',').map(tag => tag.trim()).filter(Boolean) || [],
-    };
-    
     const testCasesCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
 
     try {
-      await addDocumentNonBlocking(testCasesCollection, testCaseData);
+      const querySnapshot = await getDocs(testCasesCollection);
+      const nextIdNumber = querySnapshot.size + 1;
+      const testCaseId = `TC${String(nextIdNumber).padStart(4, '0')}`;
+      
+      const docRef = doc(testCasesCollection, testCaseId);
+
+      const testCaseData = {
+        ...values,
+        id: testCaseId,
+        projectId: params.projectId,
+        createdBy: user.uid,
+        createdAt: serverTimestamp(),
+        tags: values.tags?.split(',').map(tag => tag.trim()).filter(Boolean) || [],
+      };
+    
+      await setDocumentNonBlocking(docRef, testCaseData, {});
+      
       toast({
         title: 'Test Case Created',
-        description: `Test case "${values.title}" has been successfully created.`,
+        description: `Test case "${values.title}" has been successfully created with ID ${testCaseId}.`,
       });
       router.push(`/projects/${params.projectId}`);
     } catch (error) {
@@ -355,5 +364,3 @@ export default function NewTestCasePage({ params }: { params: { projectId: strin
     </Card>
   );
 }
-
-    

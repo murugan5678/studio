@@ -362,9 +362,9 @@ export default function ProjectDetailsPage() {
                                             aria-label={`Select test case ${tc.title}`}
                                           />
                                         </TableCell>
-                                        <TableCell>
-                                          <Link href={`/projects/${params.projectId}/test-cases/${tc.id}/edit`} className='font-mono text-xs hover:underline'>
-                                            {tc.id.substring(0, 8)}...
+                                        <TableCell className='font-mono text-sm'>
+                                          <Link href={`/projects/${params.projectId}/test-cases/${tc.id}/edit`} className='hover:underline'>
+                                            {tc.id}
                                           </Link>
                                         </TableCell>
                                         <TableCell className='font-medium'>{tc.title}</TableCell>

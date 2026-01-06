@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Papa from 'papaparse';
 import { useFirestore, useUser } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
+import { collection, serverTimestamp, doc, getDocs } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,8 +21,9 @@ const EXPECTED_HEADERS = [
   "sprint", "release", "testData", "automationPriority", "tags"
 ];
 
-export default function UploadTestCasesPage({ params }: { params: { projectId: string } }) {
+export default function UploadTestCasesPage() {
   const router = useRouter();
+  const params = useParams() as { projectId: string };
   const { toast } = useToast();
   const firestore = useFirestore();
   const { user } = useUser();
@@ -86,9 +87,17 @@ export default function UploadTestCasesPage({ params }: { params: { projectId: s
     const testCasesCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
 
     try {
+      const querySnapshot = await getDocs(testCasesCollection);
+      let currentIdCounter = querySnapshot.size;
+
       const uploadPromises = parsedData.map(row => {
+        currentIdCounter++;
+        const testCaseId = `TC${String(currentIdCounter).padStart(4, '0')}`;
+        const docRef = doc(testCasesCollection, testCaseId);
+
         const testCaseData = {
           ...row,
+          id: testCaseId,
           projectId: params.projectId,
           createdBy: user.uid,
           createdAt: serverTimestamp(),
@@ -98,7 +107,7 @@ export default function UploadTestCasesPage({ params }: { params: { projectId: s
           automationFeasibility: ['Manual', 'Automatable'].includes(row.automationFeasibility) ? row.automationFeasibility : 'Manual',
           type: ['Positive', 'Negative', 'Edge'].includes(row.type) ? row.type : 'Positive',
         };
-        return addDocumentNonBlocking(testCasesCollection, testCaseData);
+        return setDocumentNonBlocking(docRef, testCaseData, {});
       });
 
       await Promise.all(uploadPromises);
@@ -212,5 +221,3 @@ export default function UploadTestCasesPage({ params }: { params: { projectId: s
     </div>
   );
 }
-
-    

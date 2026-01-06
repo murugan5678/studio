@@ -9,7 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {nanoid} from 'nanoid';
 
 const GenerateTestScenariosInputSchema = z.object({
   inputData: z.string().describe("A data URI of a screenshot, UI image, or document (e.g., 'data:image/png;base64,...'). Alternatively, it can be a plain text description, a link to a Figma design, or the content of a BRD/PRD."),
@@ -17,7 +16,7 @@ const GenerateTestScenariosInputSchema = z.object({
 export type GenerateTestScenariosInput = z.infer<typeof GenerateTestScenariosInputSchema>;
 
 const TestCaseSchema = z.object({
-  testCaseId: z.string().describe('A unique identifier for the test case (e.g., "TC-001").'),
+  testCaseId: z.string().describe('A unique sequential identifier for the test case, formatted as "TC" followed by a number (e.g., "TC001", "TC002").'),
   title: z.string().describe('A concise title for the test case.'),
   module: z.string().describe('The primary module or feature the test case belongs to.'),
   subModule: z.string().describe('The specific sub-module or component being tested.'),
@@ -42,10 +41,10 @@ export type GenerateTestScenariosOutput = z.infer<typeof GenerateTestScenariosOu
 
 export async function generateTestScenarios(input: GenerateTestScenariosInput): Promise<GenerateTestScenariosOutput> {
   const result = await generateTestScenariosFlow(input);
-  // Post-process to add unique IDs if the model didn't, using nanoid for brevity
-  const processedCases = result.testCases.map(tc => ({
+  // Post-process to add unique IDs if the model didn't, using a simple counter.
+  const processedCases = result.testCases.map((tc, index) => ({
     ...tc,
-    testCaseId: tc.testCaseId || `tc_${nanoid(6)}`,
+    testCaseId: tc.testCaseId || `TC${String(index + 1).padStart(3, '0')}`,
   }));
   return { testCases: processedCases };
 }
@@ -58,7 +57,7 @@ const prompt = ai.definePrompt({
 
 Analyze the provided input, which could be a screenshot, a design link, a document, or a simple text description of a feature. From this, generate a diverse set of test cases covering positive paths, negative paths, and edge cases.
 
-For each test case, meticulously fill out all fields in the required structure. Pay close attention to creating meaningful titles, clear preconditions, and granular, easy-to-follow test steps.
+For each test case, meticulously fill out all fields in the required structure. Pay close attention to creating meaningful titles, clear preconditions, and granular, easy-to-follow test steps. Ensure the testCaseId is a sequential identifier like "TC001", "TC002", etc.
 
 Analyze the following input and generate the test cases:
 
