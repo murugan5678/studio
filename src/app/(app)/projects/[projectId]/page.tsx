@@ -1,14 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useDoc, useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, writeBatch } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -25,6 +25,20 @@ import {
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis } from 'recharts';
 import Link from 'next/link';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
+
 
 const chartConfig = {
     passed: { label: 'Passed', color: 'hsl(var(--chart-2))' },
@@ -43,6 +57,8 @@ const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,test
 export default function ProjectDetailsPage({ params }: { params: { projectId: string } }) {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
 
   const projectRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -103,6 +119,32 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
     }
   }, [testCases, executionRuns]);
 
+  const handleDeleteSelected = async () => {
+    if (!firestore || !user || selectedTestCases.length === 0) return;
+
+    const batch = writeBatch(firestore);
+    selectedTestCases.forEach(id => {
+      const docRef = doc(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`, id);
+      batch.delete(docRef);
+    });
+
+    try {
+      await batch.commit();
+      toast({
+        title: 'Test Cases Deleted',
+        description: `${selectedTestCases.length} test case(s) have been successfully deleted.`,
+      });
+      setSelectedTestCases([]);
+    } catch (error) {
+      console.error("Error deleting test cases:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Deletion Failed',
+        description: 'There was a problem deleting the test cases.',
+      });
+    }
+  };
+
   const kpiData = [
     { title: "Total Test Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
     { title: "Executed", value: projectStats.executedCount.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
@@ -155,6 +197,10 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
   if (!project) {
     return <div>Project not found or you do not have access.</div>;
   }
+
+  const allTestCaseIds = testCases?.map(tc => tc.id) || [];
+  const isAllSelected = selectedTestCases.length > 0 && selectedTestCases.length === allTestCaseIds.length;
+  const isSomeSelected = selectedTestCases.length > 0 && !isAllSelected;
 
   return (
     <div className="space-y-6">
@@ -211,6 +257,28 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                 <TabsTrigger value="executions">Test Execution</TabsTrigger>
             </TabsList>
             <div className='flex items-center gap-2'>
+                {selectedTestCases.length > 0 && (
+                  <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete ({selectedTestCases.length})
+                          </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                          <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the selected {selectedTestCases.length} test case(s).
+                              </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteSelected}>Continue</AlertDialogAction>
+                          </AlertDialogFooter>
+                      </AlertDialogContent>
+                  </AlertDialog>
+                )}
                 <Button asChild variant="outline">
                     <Link href={`/projects/${params.projectId}/upload-test-cases`}>
                         <Upload className="mr-2 h-4 w-4" /> Upload Cases
@@ -236,6 +304,20 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[40px]">
+                                <Checkbox
+                                    checked={isAllSelected}
+                                    onCheckedChange={(value) => {
+                                      if (value) {
+                                        setSelectedTestCases(allTestCaseIds);
+                                      } else {
+                                        setSelectedTestCases([]);
+                                      }
+                                    }}
+                                    aria-label="Select all"
+                                    indeterminate={isSomeSelected}
+                                  />
+                                </TableHead>
                                 <TableHead>ID</TableHead>
                                 <TableHead>Title</TableHead>
                                 <TableHead>Module</TableHead>
@@ -249,14 +331,27 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                         <TableBody>
                            {areTestCasesLoading && (
                             <TableRow>
-                                <TableCell colSpan={8} className="h-24 text-center">
+                                <TableCell colSpan={9} className="h-24 text-center">
                                     Loading test cases...
                                 </TableCell>
                             </TableRow>
                            )}
                            {!areTestCasesLoading && testCases && testCases.length > 0 ? (
                                 testCases.map(tc => (
-                                    <TableRow key={tc.id}>
+                                    <TableRow key={tc.id} data-state={selectedTestCases.includes(tc.id) && "selected"}>
+                                        <TableCell>
+                                          <Checkbox
+                                            checked={selectedTestCases.includes(tc.id)}
+                                            onCheckedChange={(value) => {
+                                              if (value) {
+                                                setSelectedTestCases([...selectedTestCases, tc.id]);
+                                              } else {
+                                                setSelectedTestCases(selectedTestCases.filter(id => id !== tc.id));
+                                              }
+                                            }}
+                                            aria-label={`Select test case ${tc.title}`}
+                                          />
+                                        </TableCell>
                                         <TableCell>
                                           <Link href={`/projects/${params.projectId}/test-cases/${tc.id}/edit`} className='font-mono text-xs hover:underline'>
                                             {tc.id.substring(0, 8)}...
@@ -280,7 +375,7 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                            ) : (
                             !areTestCasesLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="h-24 text-center">
+                                    <TableCell colSpan={9} className="h-24 text-center">
                                         No test cases yet. Start by creating one.
                                     </TableCell>
                                 </TableRow>
