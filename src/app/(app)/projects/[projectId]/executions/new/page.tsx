@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useFieldArray, useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { useRouter, useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,7 @@ import type { TestCase } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Trash2, Info } from 'lucide-react';
-import { useRef } from 'react';
+import { ArrowLeft, Trash2, Info, Loader2 } from 'lucide-react';
 
 const executionFormSchema = z.object({
   title: z.string().min(2, 'Title is required.'),
@@ -43,12 +42,21 @@ const executionResultsSchema = z.object({
       testCaseId: z.string(),
       status: z.enum(['Passed', 'Failed', 'Blocked', 'Deferred', "Can't Test"]),
       comments: z.string().optional(),
-      evidenceLinks: z.string().optional(),
-      evidenceFiles: z.custom<FileList>().optional(),
-      filePreviews: z.array(z.string()).optional(),
+      evidenceLinks: z.string().optional(), // For URLs
+      evidenceDataUris: z.array(z.string()).optional(), // For file previews
     })
   ),
 });
+
+
+function fileToDataUri(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
 
 
 export default function NewExecutionPage() {
@@ -59,7 +67,9 @@ export default function NewExecutionPage() {
   const { user } = useUser();
   const [step, setStep] = useState(1);
   const [selectedTestCases, setSelectedTestCases] = useState<TestCase[]>([]);
+  const [isProcessingFiles, setIsProcessingFiles] = useState(false);
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
 
   const testCasesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -99,7 +109,7 @@ export default function NewExecutionPage() {
             status: 'Passed',
             comments: '',
             evidenceLinks: '',
-            filePreviews: [],
+            evidenceDataUris: [],
         }))
     });
 
@@ -118,12 +128,14 @@ export default function NewExecutionPage() {
       userId: user.uid,
       createdAt: serverTimestamp(),
       results: values.executions.map(ex => {
+        const urlLinks = ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : [];
+        const allLinks = [...urlLinks, ...(ex.evidenceDataUris || [])];
         return {
           testCaseId: ex.testCaseId,
           status: ex.status,
           comments: ex.comments || '',
-          evidenceLinks: ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : [],
-          evidenceFiles: ex.evidenceFiles ? Array.from(ex.evidenceFiles).map(file => file.name) : [],
+          evidenceLinks: allLinks,
+          evidenceFiles: [], // Deprecating direct file handling for now in favor of data URIs
         }
       }),
     };
@@ -139,28 +151,42 @@ export default function NewExecutionPage() {
     router.push(`/projects/${params.projectId}`);
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const files = e.target.files;
     if (files) {
-      const currentExecution = resultsForm.getValues(`executions.${index}`);
-      update(index, { ...currentExecution, evidenceFiles: files });
+      setIsProcessingFiles(true);
+      try {
+        const dataUriPromises = Array.from(files).map(fileToDataUri);
+        const dataUris = await Promise.all(dataUriPromises);
+        
+        const currentExecution = resultsForm.getValues(`executions.${index}`);
+        const existingUris = currentExecution.evidenceDataUris || [];
 
-      const newPreviews = Array.from(files).map(file => URL.createObjectURL(file));
-      update(index, { 
-        ...resultsForm.getValues(`executions.${index}`), 
-        filePreviews: newPreviews
-      });
+        update(index, { 
+          ...currentExecution, 
+          evidenceDataUris: [...existingUris, ...dataUris]
+        });
+      } catch (error) {
+        toast({
+          variant: 'destructive',
+          title: 'File Error',
+          description: 'Could not process one or more files.',
+        });
+      } finally {
+        setIsProcessingFiles(false);
+         if (fileInputRefs.current[index]) {
+            fileInputRefs.current[index]!.value = '';
+        }
+      }
     }
   };
 
-  useEffect(() => {
-    // Clean up object URLs on unmount
-    return () => {
-        resultsForm.getValues('executions').forEach(exec => {
-            exec.filePreviews?.forEach(previewUrl => URL.revokeObjectURL(previewUrl));
-        });
-    };
-  }, [resultsForm]);
+  const removeDataUri = (index: number, uriIndex: number) => {
+    const currentExecution = resultsForm.getValues(`executions.${index}`);
+    const updatedUris = [...(currentExecution.evidenceDataUris || [])];
+    updatedUris.splice(uriIndex, 1);
+    update(index, { ...currentExecution, evidenceDataUris: updatedUris });
+  };
   
   return (
     <Card>
@@ -266,7 +292,7 @@ export default function NewExecutionPage() {
                                 const testCase = selectedTestCases.find(tc => tc.id === field.testCaseId);
                                 if (!testCase) return null;
                                 
-                                const filePreviews = resultsForm.watch(`executions.${index}.filePreviews`) || [];
+                                const evidenceDataUris = resultsForm.watch(`executions.${index}.evidenceDataUris`) || [];
 
                                 return (
                                 <TableRow key={field.id}>
@@ -316,59 +342,47 @@ export default function NewExecutionPage() {
                                             render={({ field }) => (
                                                 <FormItem className='flex-1'>
                                                     <FormControl>
-                                                        <Input placeholder="Paste URL (comma-separated for multiple)" {...field} value={field.value || ''} />
+                                                        <Input placeholder="Paste URL (comma-separated)" {...field} value={field.value || ''} />
                                                     </FormControl>
                                                 </FormItem>
                                             )}
                                         />
-                                        <Button size="icon" variant="ghost" type="button" onClick={() => resultsForm.setValue(`executions.${index}.evidenceLinks`, '')}>
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
                                         </div>
                                         <div className='flex items-start gap-1'>
-                                          <FormField
-                                            control={resultsForm.control}
-                                            name={`executions.${index}.evidenceFiles`}
-                                            render={({ field: { onChange } }) => (
-                                                <FormItem className='flex-1'>
-                                                    <div className='flex items-center gap-1'>
-                                                    <FormControl>
-                                                        <Input
-                                                            type="file" 
-                                                            multiple
-                                                            accept="image/*,video/*"
-                                                            onChange={(e) => handleFileChange(e, index)}
-                                                            ref={el => fileInputRefs.current[index] = el}
-                                                        />
-                                                    </FormControl>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>
-                                                            <p className='text-xs max-w-xs'>File uploads are for local preview only and will not be saved permanently. Only the file name is stored.</p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                    </div>
-                                                </FormItem>
-                                            )}
-                                          />
-                                          <Button size="icon" variant="ghost" type="button" onClick={() => {
-                                              const currentExecution = resultsForm.getValues(`executions.${index}`);
-                                              currentExecution.filePreviews?.forEach(URL.revokeObjectURL);
-                                              update(index, { ...currentExecution, evidenceFiles: undefined, filePreviews: [] });
-                                              if (fileInputRefs.current[index]) {
-                                                fileInputRefs.current[index]!.value = '';
-                                              }
-                                          }}>
-                                              <Trash2 className="h-4 w-4" />
-                                          </Button>
+                                          <FormItem className='flex-1'>
+                                              <div className='flex items-center gap-1'>
+                                              <FormControl>
+                                                  <Input
+                                                      type="file" 
+                                                      multiple
+                                                      accept="image/*,video/*"
+                                                      disabled={isProcessingFiles}
+                                                      onChange={(e) => handleFileChange(e, index)}
+                                                      ref={el => fileInputRefs.current[index] = el}
+                                                  />
+                                              </FormControl>
+                                                {isProcessingFiles && <Loader2 className='h-4 w-4 animate-spin'/>}
+                                              </div>
+                                          </FormItem>
                                         </div>
-                                        {filePreviews.length > 0 && (
+                                        {(evidenceDataUris.length > 0) && (
                                             <div className="flex flex-wrap gap-2 mt-2">
-                                                {filePreviews.map((previewUrl, i) => (
-                                                    <div key={i} className="relative w-20 h-20">
-                                                        <Image src={previewUrl} alt={`Preview ${i}`} layout="fill" objectFit="cover" className="rounded-md"/>
+                                                {evidenceDataUris.map((uri, uriIndex) => (
+                                                    <div key={uriIndex} className="relative w-20 h-20 group">
+                                                        {uri.startsWith('data:image') ? (
+                                                            <Image src={uri} alt={`Preview ${uriIndex}`} layout="fill" objectFit="cover" className="rounded-md"/>
+                                                        ) : (
+                                                            <video src={uri} className="w-20 h-20 rounded-md object-cover" />
+                                                        )}
+                                                        <Button 
+                                                          size="icon" 
+                                                          variant="destructive" 
+                                                          className="absolute -top-2 -right-2 h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                                          onClick={() => removeDataUri(index, uriIndex)}
+                                                          type='button'
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -384,7 +398,9 @@ export default function NewExecutionPage() {
                            <ArrowLeft className="mr-2 h-4 w-4" />
                            Back
                         </Button>
-                        <Button type="submit">Save Execution Run</Button>
+                        <Button type="submit" disabled={isProcessingFiles}>
+                          {isProcessingFiles ? 'Processing...' : 'Save Execution Run'}
+                        </Button>
                     </div>
                 </form>
             </Form>
