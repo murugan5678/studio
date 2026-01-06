@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Folder, Beaker, CheckCircle, XCircle } from "lucide-react";
 import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { useMemo } from "react";
+import Link from "next/link";
 
 interface KpiCardsProps {
   projects: Project[];
@@ -29,24 +30,26 @@ export function KpiCards({ projects, testCases, executions }: KpiCardsProps) {
 
 
   const kpiData = [
-    { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder },
-    { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker },
-    { title: "Tests Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle },
-    { title: "Tests Failed", value: executionStats.failed.toLocaleString(), icon: XCircle },
+    { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder, href: '/projects' },
+    { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker, href: '/projects' },
+    { title: "Tests Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle, href: '/executions' },
+    { title: "Tests Failed", value: executionStats.failed.toLocaleString(), icon: XCircle, href: '/executions' },
   ];
 
   return (
     <>
       {kpiData.map((item, index) => (
-        <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-            <item.icon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{item.value}</div>
-          </CardContent>
-        </Card>
+        <Link href={item.href} key={index}>
+            <Card className="hover:border-primary transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+                <item.icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{item.value}</div>
+            </CardContent>
+            </Card>
+        </Link>
       ))}
     </>
   );
