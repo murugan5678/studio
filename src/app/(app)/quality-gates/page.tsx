@@ -42,8 +42,12 @@ export default function QualityGatesPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
+        if (areProjectsLoading) {
+            setIsLoading(true);
+            return;
+        }
         if (!projects || projects.length === 0 || !user || !firestore) {
-            if(!areProjectsLoading) setIsLoading(false);
+            setIsLoading(false);
             return;
         }
 
