@@ -26,7 +26,7 @@ import { PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
+import type { Project, TestExecutionRun } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -49,25 +49,32 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [projectsWithStats, setProjectsWithStats] = useState<ProjectWithStats[]>([]);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
 
   const projectsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
     return collection(firestore, `users/${user.uid}/projects`);
   }, [user, firestore]);
 
-  const { data: projects, isLoading } = useCollection<Project>(projectsQuery);
+  const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
   useEffect(() => {
-    if (!projects || !user || !firestore) return;
+    if (!projects || !user || !firestore) {
+      if(!areProjectsLoading) setIsStatsLoading(false);
+      return;
+    };
 
+    setIsStatsLoading(true);
     const fetchStatsForProjects = async () => {
       const enhancedProjects = await Promise.all(
         projects.map(async (project) => {
           const testCasesRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`);
           const executionsRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`);
 
-          const testCasesSnap = await getDocs(testCasesRef);
-          const executionsSnap = await getDocs(executionsRef);
+          const [testCasesSnap, executionsSnap] = await Promise.all([
+            getDocs(testCasesRef),
+            getDocs(executionsRef)
+          ]);
 
           const totalTestCases = testCasesSnap.size;
           const executedTestCaseIds = new Set<string>();
@@ -81,13 +88,12 @@ export default function ProjectsPage() {
 
           const completion = totalTestCases > 0 ? Math.round((executedTestCaseIds.size / totalTestCases) * 100) : 0;
           
-          // Simplified status logic for now
           let status = "In Progress";
           let variant: ProjectWithStats['stats']['variant'] = 'secondary';
           if (completion === 100) {
             status = 'Completed';
             variant = 'default';
-          } else if (completion === 0) {
+          } else if (totalTestCases > 0 && completion === 0) {
             status = 'Not Started';
             variant = 'outline';
           }
@@ -104,10 +110,11 @@ export default function ProjectsPage() {
         })
       );
       setProjectsWithStats(enhancedProjects);
+      setIsStatsLoading(false);
     };
 
     fetchStatsForProjects();
-  }, [projects, user, firestore]);
+  }, [projects, user, firestore, areProjectsLoading]);
 
 
   const handleCreateProject = async () => {
@@ -128,6 +135,8 @@ export default function ProjectsPage() {
     setNewProjectDescription('');
     setIsDialogOpen(false);
   };
+  
+  const isLoading = areProjectsLoading || isStatsLoading;
 
   return (
     <>
@@ -211,7 +220,7 @@ export default function ProjectsPage() {
                     </Link>
                     <Badge variant={stats.variant}>{stats.status}</Badge>
                   </CardTitle>
-                  <CardDescription className="line-clamp-2">{project.description}</CardDescription>
+                  <CardDescription className="line-clamp-2 h-[40px]">{project.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
                     <div className="text-sm text-muted-foreground">
