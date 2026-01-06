@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { collection, serverTimestamp } from 'firebase/firestore';
+import { ArrowLeft } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
@@ -342,7 +343,10 @@ export default function NewTestCasePage({ params }: { params: { projectId: strin
                 </div>
 
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => router.back()}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                    </Button>
                     <Button type="submit">Create Test Case</Button>
                 </div>
             </form>
@@ -351,3 +355,5 @@ export default function NewTestCasePage({ params }: { params: { projectId: strin
     </Card>
   );
 }
+
+    

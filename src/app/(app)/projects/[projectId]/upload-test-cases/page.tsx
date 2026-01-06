@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertCircle, CheckCircle, Upload, File } from 'lucide-react';
+import { AlertCircle, CheckCircle, Upload, File, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const EXPECTED_HEADERS = [
@@ -122,6 +122,12 @@ export default function UploadTestCasesPage({ params }: { params: { projectId: s
 
   return (
     <div className="grid gap-6">
+       <div className='flex justify-start'>
+          <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+          </Button>
+       </div>
       <Card>
         <CardHeader>
           <CardTitle>Upload Test Cases</CardTitle>
@@ -206,3 +212,5 @@ export default function UploadTestCasesPage({ params }: { params: { projectId: s
     </div>
   );
 }
+
+    

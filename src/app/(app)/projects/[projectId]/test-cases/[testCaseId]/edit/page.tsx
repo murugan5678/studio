@@ -32,6 +32,7 @@ import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { doc, serverTimestamp } from 'firebase/firestore';
 import type { TestCase } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft } from 'lucide-react';
 
 const formSchema = z.object({
   title: z.string().min(2, { message: 'Title must be at least 2 characters.' }),
@@ -386,7 +387,10 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
                 </div>
 
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => router.back()}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Back
+                    </Button>
                     <Button type="submit">Save Changes</Button>
                 </div>
             </form>
@@ -395,3 +399,5 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
     </Card>
   );
 }
+
+    

@@ -28,6 +28,7 @@ import type { TestCase } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArrowLeft } from 'lucide-react';
 
 const executionFormSchema = z.object({
   title: z.string().min(2, 'Title is required.'),
@@ -200,7 +201,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                 )}
               />
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
                 <Button type="submit">Next: Record Results</Button>
               </div>
             </form>
@@ -263,7 +267,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                         </TableBody>
                     </Table>
                     <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
+                        <Button type="button" variant="outline" onClick={() => setStep(1)}>
+                           <ArrowLeft className="mr-2 h-4 w-4" />
+                           Back
+                        </Button>
                         <Button type="submit">Save Execution Run</Button>
                     </div>
                 </form>
@@ -273,3 +280,5 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
     </Card>
   );
 }
+
+    
