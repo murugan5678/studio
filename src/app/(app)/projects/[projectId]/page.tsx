@@ -339,7 +339,7 @@ export default function ProjectDetailsPage() {
                                       }
                                     }}
                                     aria-label="Select all"
-                                    indeterminate={isSomeSelected ? "indeterminate" : false}
+                                    data-indeterminate={isSomeSelected}
                                   />
                                 </TableHead>
                                 <TableHead>ID</TableHead>
@@ -484,6 +484,3 @@ export default function ProjectDetailsPage() {
     </div>
   );
 }
-
-    
-    

@@ -138,7 +138,7 @@ export default function ReviewTestCasesPage() {
                                       }
                                     }}
                                     aria-label="Select all"
-                                    indeterminate={isSomeSelected}
+                                    data-indeterminate={isSomeSelected}
                                   />
                             </TableHead>
                             <TableHead>ID</TableHead>
@@ -195,5 +195,3 @@ export default function ReviewTestCasesPage() {
     </div>
   );
 }
-
-    
