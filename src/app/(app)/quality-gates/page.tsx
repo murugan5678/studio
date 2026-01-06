@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
-import type { Project, TestCase, TestExecutionRun, Defect, DeploymentApproval } from '@/lib/types';
+import type { Project, TestExecutionRun, Defect, DeploymentApproval } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -41,20 +41,16 @@ export default function QualityGatesPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (!projects || !user || !firestore) {
-            if (!areProjectsLoading) {
-                setIsLoading(false);
-            }
+        if (areProjectsLoading) {
+            setIsLoading(true);
             return;
         }
-        
-        if (projects.length === 0) {
+        if (!projects || !user || !firestore) {
             setIsLoading(false);
             return;
         }
 
         const fetchProjectsData = async () => {
-            setIsLoading(true);
             const enrichedData = await Promise.all(projects.map(async (project) => {
                 const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
                 const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
@@ -105,7 +101,7 @@ export default function QualityGatesPage() {
         fetchProjectsData();
     }, [projects, user, firestore, areProjectsLoading]);
     
-    if (isLoading && areProjectsLoading) {
+    if (isLoading) {
         return (
             <Card>
                 <CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader>
@@ -148,7 +144,7 @@ export default function QualityGatesPage() {
                         </TableHeader>
                         <TableBody>
                             {projectsData.length > 0 ? projectsData.map(p => (
-                                <TableRow key={p.id} className="cursor-pointer" onClick={() => router.push(`/quality-gates/${p.id}`)}>
+                                <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/quality-gates/${p.id}`)}>
                                     <TableCell className="font-medium">{p.name}</TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
