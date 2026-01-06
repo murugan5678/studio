@@ -71,14 +71,12 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
 
   const resultsForm = useForm<z.infer<typeof executionResultsSchema>>({
     resolver: zodResolver(executionResultsSchema),
-  });
-  
-  const { fields, append } = useFieldArray({
-    name: "executions",
-    control: resultsForm.control,
+    defaultValues: {
+        executions: []
+    }
   });
 
-  async function onSelectTestCases(values: z.infer<typeof executionFormSchema>) {
+  function onSelectTestCases(values: z.infer<typeof executionFormSchema>) {
     if (!testCases) return;
     const selected = testCases.filter(tc => values.testCaseIds.includes(tc.id));
     setSelectedTestCases(selected);
@@ -110,7 +108,6 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
       results: values.executions,
     };
     
-    // In a real app, this would be a single batch write.
     const testExecutionsCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
     
     try {
@@ -202,7 +199,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                   </FormItem>
                 )}
               />
-              <Button type="submit">Next: Record Results</Button>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => router.back()}>Cancel</Button>
+                <Button type="submit">Next: Record Results</Button>
+              </div>
             </form>
           </Form>
         )}
@@ -263,7 +263,7 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                         </TableBody>
                     </Table>
                     <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+                        <Button type="button" variant="outline" onClick={() => setStep(1)}>Back</Button>
                         <Button type="submit">Save Execution Run</Button>
                     </div>
                 </form>
