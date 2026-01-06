@@ -168,12 +168,12 @@ export default function ProjectDetailsPage() {
   };
 
   const kpiData = [
-    { title: "Total Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle, color: "text-blue-500" },
-    { title: "Passed", value: projectStats.Passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
-    { title: "Failed", value: projectStats.Failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
-    { title: "Blocked", value: projectStats.Blocked.toLocaleString(), icon: Ban, color: "text-yellow-500" },
-    { title: "Deferred", value: projectStats.Deferred.toLocaleString(), icon: PauseCircle, color: "text-gray-500" },
-    { title: "Can't Test", value: projectStats['Can\'t Test'].toLocaleString(), icon: ShieldAlert, color: "text-orange-500" },
+    { title: "Total Cases", value: projectStats.totalTestCases.toLocaleString(), icon: HelpCircle },
+    { title: "Passed", value: projectStats.Passed.toLocaleString(), icon: CheckCircle },
+    { title: "Failed", value: projectStats.Failed.toLocaleString(), icon: XCircle },
+    { title: "Blocked", value: projectStats.Blocked.toLocaleString(), icon: Ban },
+    { title: "Deferred", value: projectStats.Deferred.toLocaleString(), icon: PauseCircle },
+    { title: "Can't Test", value: projectStats['Can\'t Test'].toLocaleString(), icon: ShieldAlert },
   ];
 
   const chartData = useMemo(() => {
@@ -237,7 +237,7 @@ export default function ProjectDetailsPage() {
             <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-                <item.icon className={`h-4 w-4 text-muted-foreground ${item.color}`} />
+                <item.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{item.value}</div>

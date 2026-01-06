@@ -29,22 +29,22 @@ export function KpiCards({ projects, testCases, executions }: KpiCardsProps) {
 
 
   const kpiData = [
-    { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder, color: "text-sky-500" },
-    { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker, color: "text-amber-500" },
-    { title: "Tests Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle, color: "text-green-500" },
-    { title: "Tests Failed", value: executionStats.failed.toLocaleString(), icon: XCircle, color: "text-red-500" },
+    { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder },
+    { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker },
+    { title: "Tests Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle },
+    { title: "Tests Failed", value: executionStats.failed.toLocaleString(), icon: XCircle },
   ];
 
   return (
     <>
       {kpiData.map((item, index) => (
-        <Card key={index} className="hover:shadow-lg transition-shadow duration-300">
+        <Card key={index}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{item.title}</CardTitle>
-            <item.icon className={`h-5 w-5 ${item.color}`} />
+            <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+            <item.icon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{item.value}</div>
+            <div className="text-2xl font-bold">{item.value}</div>
           </CardContent>
         </Card>
       ))}
