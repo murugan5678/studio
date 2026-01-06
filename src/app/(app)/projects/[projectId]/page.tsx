@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useDoc, useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, writeBatch, query, where } from 'firebase/firestore';
-import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
+import { collection, doc, writeBatch, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import type { Project, TestCase, TestExecutionRun, TestExecutionResult } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,6 +44,9 @@ import { useRouter, useParams } from 'next/navigation';
 const chartConfig = {
     passed: { label: 'Passed', color: 'hsl(var(--chart-2))' },
     failed: { label: 'Failed', color: 'hsl(var(--chart-1))' },
+    blocked: { label: 'Blocked', color: 'hsl(var(--chart-3))' },
+    deferred: { label: 'Deferred', color: 'hsl(var(--chart-4))' },
+    "Can't Test": { label: 'Can\'t Test', color: 'hsl(var(--chart-5))' },
 };
 
 const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -54,14 +57,13 @@ const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' 
 };
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
-    Passed: 'default',
+    Passed: 'secondary',
     Failed: 'destructive',
     Blocked: 'outline',
     Deferred: 'outline',
     "Can't Test": 'outline'
 };
-statusVariant.Passed = 'secondary';
-statusVariant.Failed = 'destructive';
+
 
 const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags,ticketUrl";
 
@@ -90,7 +92,7 @@ export default function ProjectDetailsPage() {
 
   const executionsQuery = useMemoFirebase(() => {
     if(!user || !firestore) return null;
-    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
+    return query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`), orderBy('createdAt', 'desc'));
   }, [user, firestore, params.projectId]);
 
   const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
@@ -110,20 +112,34 @@ export default function ProjectDetailsPage() {
   };
   
   const projectStats = useMemo(() => {
-    const totalTestCases = testCases?.length || 0;
-    const statusCounts: { [key: string]: number } = { 'Passed': 0, 'Failed': 0, 'Blocked': 0, 'Deferred': 0, 'Can\'t Test': 0 };
-    const executedTestCaseIds = new Set<string>();
+    const statusCounts: { [key: string]: number } = { Passed: 0, Failed: 0, Blocked: 0, Deferred: 0, "Can't Test": 0, NotRun: 0 };
+    const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
 
+    // Determine the latest result for each test case
     (executionRuns || []).forEach(run => {
         run.results.forEach(result => {
-            executedTestCaseIds.add(result.testCaseId);
-            if(statusCounts.hasOwnProperty(result.status)) {
-                statusCounts[result.status as keyof typeof statusCounts]++;
+            const existing = latestResults.get(result.testCaseId);
+            if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
+                latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
             }
         });
     });
 
-    const executedCount = executedTestCaseIds.size;
+    const approvedTestCases = testCases || [];
+    const totalTestCases = approvedTestCases.length;
+
+    approvedTestCases.forEach(tc => {
+        const latestResult = latestResults.get(tc.id);
+        if (latestResult) {
+            if (statusCounts.hasOwnProperty(latestResult.status)) {
+                statusCounts[latestResult.status]++;
+            }
+        } else {
+            statusCounts.NotRun++;
+        }
+    });
+
+    const executedCount = totalTestCases - statusCounts.NotRun;
     const completion = totalTestCases > 0 ? Math.round((executedCount / totalTestCases) * 100) : 0;
 
     return {
@@ -132,7 +148,7 @@ export default function ProjectDetailsPage() {
         ...statusCounts,
         completion
     }
-  }, [testCases, executionRuns]);
+}, [testCases, executionRuns]);
 
   const handleDeleteSelected = async () => {
     if (!firestore || !user || selectedTestCases.length === 0) return;
@@ -178,19 +194,20 @@ export default function ProjectDetailsPage() {
   ];
 
   const chartData = useMemo(() => {
-    const monthlyData: {[key: string]: {passed: number, failed: number}} = {};
+    const monthlyData: {[key: string]: {passed: number, failed: number, blocked: number, deferred: number, "Can't Test": number}} = {};
     
     executionRuns?.forEach(run => {
         const date = run.createdAt.toDate();
         const month = date.toLocaleString('default', { month: 'short' });
         
         if(!monthlyData[month]) {
-            monthlyData[month] = { passed: 0, failed: 0 };
+            monthlyData[month] = { passed: 0, failed: 0, blocked: 0, deferred: 0, "Can't Test": 0 };
         }
 
         run.results.forEach(result => {
-            if(result.status === 'Passed') monthlyData[month].passed++;
-            if(result.status === 'Failed') monthlyData[month].failed++;
+            if(monthlyData[month].hasOwnProperty(result.status)) {
+                monthlyData[month][result.status as keyof typeof monthlyData[string]]++;
+            }
         })
     });
 
@@ -249,8 +266,8 @@ export default function ProjectDetailsPage() {
 
       <Card>
         <CardHeader>
-            <CardTitle>Execution Summary</CardTitle>
-            <CardDescription>Test results over the last months for this project.</CardDescription>
+            <CardTitle>Execution Summary (Historical)</CardTitle>
+            <CardDescription>Total test results over the last months for this project.</CardDescription>
         </CardHeader>
         <CardContent>
         <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -267,8 +284,11 @@ export default function ProjectDetailsPage() {
                   cursor={false}
                   content={<ChartTooltipContent indicator="dashed" />}
                 />
-                <Bar dataKey="passed" fill="var(--color-passed)" radius={4} />
-                <Bar dataKey="failed" fill="var(--color-failed)" radius={4} />
+                <Bar dataKey="passed" fill="var(--color-passed)" radius={4} stackId="a" />
+                <Bar dataKey="failed" fill="var(--color-failed)" radius={4} stackId="a" />
+                <Bar dataKey="blocked" fill="var(--color-blocked)" radius={4} stackId="a" />
+                <Bar dataKey="deferred" fill="var(--color-deferred)" radius={4} stackId="a" />
+                <Bar dataKey="Can't Test" fill="var(--color-Can't Test)" radius={4} stackId="a" />
               </BarChart>
             </ChartContainer>
         </CardContent>

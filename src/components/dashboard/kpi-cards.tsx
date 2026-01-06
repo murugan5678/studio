@@ -2,38 +2,36 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Folder, Beaker, CheckCircle, XCircle } from "lucide-react";
-import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
+import type { Project, TestCase, TestExecutionResult } from '@/lib/types';
 import { useMemo } from "react";
 import Link from "next/link";
 
 interface KpiCardsProps {
   projects: Project[];
   testCases: TestCase[];
-  executions: TestExecutionRun[];
+  latestResults: Map<string, TestExecutionResult>;
 }
 
-export function KpiCards({ projects, testCases, executions }: KpiCardsProps) {
+export function KpiCards({ projects, testCases, latestResults }: KpiCardsProps) {
 
   const executionStats = useMemo(() => {
     let passed = 0;
     let failed = 0;
-    if (executions) {
-        executions.forEach(run => {
-            run.results.forEach(result => {
-                if (result.status === 'Passed') passed++;
-                if (result.status === 'Failed') failed++;
-            });
-        });
-    }
+    
+    latestResults.forEach(result => {
+        if (result.status === 'Passed') passed++;
+        if (result.status === 'Failed') failed++;
+    });
+
     return { passed, failed };
-  }, [executions]);
+  }, [latestResults]);
 
 
   const kpiData = [
     { title: "Total Projects", value: (projects || []).length.toLocaleString(), icon: Folder, href: '/projects' },
     { title: "Total Test Cases", value: (testCases || []).length.toLocaleString(), icon: Beaker, href: '/projects' },
-    { title: "Tests Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle, href: '/executions' },
-    { title: "Tests Failed", value: executionStats.failed.toLocaleString(), icon: XCircle, href: '/executions' },
+    { title: "Currently Passed", value: executionStats.passed.toLocaleString(), icon: CheckCircle, href: '/executions' },
+    { title: "Currently Failed", value: executionStats.failed.toLocaleString(), icon: XCircle, href: '/executions' },
   ];
 
   return (

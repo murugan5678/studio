@@ -3,20 +3,21 @@ import { KpiCards } from '@/components/dashboard/kpi-cards';
 import { OverviewChart } from '@/components/dashboard/overview-chart';
 import { RecentProjects } from '@/components/dashboard/recent-projects';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
+import { collection, query, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import type { Project, TestCase, TestExecutionRun, TestExecutionResult } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 
-interface ProjectData {
+interface AggregatedData {
     testCases: TestCase[];
     executions: TestExecutionRun[];
+    latestResults: Map<string, TestExecutionResult>;
 }
 
 export default function DashboardPage() {
     const { user } = useUser();
     const firestore = useFirestore();
-    const [allProjectsData, setAllProjectsData] = useState<ProjectData>({ testCases: [], executions: [] });
+    const [allProjectsData, setAllProjectsData] = useState<AggregatedData>({ testCases: [], executions: [], latestResults: new Map() });
     const [isDataLoading, setIsDataLoading] = useState(true);
 
     const projectsQuery = useMemoFirebase(() => {
@@ -41,17 +42,36 @@ export default function DashboardPage() {
         setIsDataLoading(true);
         const fetchAllData = async () => {
             const testCasesPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testCases`)));
-            const executionsPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`)));
+            const executionsPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`), orderBy('createdAt', 'desc'))));
 
             const testCasesSnaps = await Promise.all(testCasesPromises);
             const executionsSnaps = await Promise.all(executionsPromises);
 
             const allTestCases = testCasesSnaps.flatMap(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TestCase)));
             const allExecutions = executionsSnaps.flatMap(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TestExecutionRun)));
+            
+            // Logic to find the latest result for each test case
+            const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
+            allExecutions.forEach(run => {
+                run.results.forEach(result => {
+                    const existing = latestResults.get(result.testCaseId);
+                    if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
+                        latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
+                    }
+                });
+            });
+
+            const finalLatestResults = new Map<string, TestExecutionResult>();
+            latestResults.forEach((value, key) => {
+                const { executionDate, ...result } = value;
+                finalLatestResults.set(key, result);
+            });
+
 
             setAllProjectsData({
                 testCases: allTestCases,
-                executions: allExecutions
+                executions: allExecutions,
+                latestResults: finalLatestResults,
             });
             setIsDataLoading(false);
         };
@@ -59,6 +79,16 @@ export default function DashboardPage() {
         fetchAllData();
 
     }, [projects, user, firestore, areProjectsLoading]);
+    
+    const executionStats = useMemo(() => {
+        let passed = 0;
+        let failed = 0;
+        allProjectsData.latestResults.forEach(result => {
+            if (result.status === 'Passed') passed++;
+            else if (result.status === 'Failed') failed++;
+        });
+        return { passed, failed };
+    }, [allProjectsData.latestResults]);
 
 
     if (areProjectsLoading || areRecentProjectsLoading || isDataLoading) {
@@ -78,7 +108,11 @@ export default function DashboardPage() {
     return (
         <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <KpiCards projects={projects || []} testCases={allProjectsData.testCases} executions={allProjectsData.executions} />
+                <KpiCards 
+                    projects={projects || []} 
+                    testCases={allProjectsData.testCases} 
+                    latestResults={allProjectsData.latestResults} 
+                />
             </div>
             <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
                 <OverviewChart executions={allProjectsData.executions} />
