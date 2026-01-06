@@ -34,15 +34,23 @@ export default function DashboardPage() {
     const { data: recentProjects, isLoading: areRecentProjectsLoading } = useCollection<Project>(recentProjectsQuery);
 
     useEffect(() => {
+        if (areProjectsLoading) return; // Wait until projects are loaded
         if (!projects || !user || !firestore) {
-            if(!areProjectsLoading) setIsDataLoading(false);
+            setIsDataLoading(false);
+            setAllProjectsData({ testCases: [], executions: [], latestResults: new Map() });
             return;
         };
+
+        if (projects.length === 0) {
+            setIsDataLoading(false);
+            setAllProjectsData({ testCases: [], executions: [], latestResults: new Map() });
+            return;
+        }
 
         setIsDataLoading(true);
         const fetchAllData = async () => {
             const testCasesPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testCases`), where('status', '==', 'Approved'))));
-            const executionsPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`), orderBy('createdAt', 'desc'))));
+            const executionsPromises = projects.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`))));
 
             const testCasesSnaps = await Promise.all(testCasesPromises);
             const executionsSnaps = await Promise.all(executionsPromises);
@@ -50,12 +58,12 @@ export default function DashboardPage() {
             const allTestCases = testCasesSnaps.flatMap(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TestCase)));
             const allExecutions = executionsSnaps.flatMap(snap => snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TestExecutionRun)));
             
-            // Logic to find the latest result for each test case
             const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
             allExecutions.forEach(run => {
+                if (!run.createdAt || typeof run.createdAt.toMillis !== 'function') return;
                 run.results.forEach(result => {
                     const existing = latestResults.get(result.testCaseId);
-                    if (!existing || (run.createdAt && 'toMillis' in run.createdAt && existing.executionDate && 'toMillis' in existing.executionDate && run.createdAt.toMillis() > existing.executionDate.toMillis())) {
+                    if (!existing || (existing.executionDate && typeof existing.executionDate.toMillis === 'function' && run.createdAt.toMillis() > existing.executionDate.toMillis())) {
                         latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
                     }
                 });
@@ -80,18 +88,9 @@ export default function DashboardPage() {
 
     }, [projects, user, firestore, areProjectsLoading]);
     
-    const executionStats = useMemo(() => {
-        let passed = 0;
-        let failed = 0;
-        allProjectsData.latestResults.forEach(result => {
-            if (result.status === 'Passed') passed++;
-            else if (result.status === 'Failed') failed++;
-        });
-        return { passed, failed };
-    }, [allProjectsData.latestResults]);
+    const isLoading = areProjectsLoading || areRecentProjectsLoading || isDataLoading;
 
-
-    if (areProjectsLoading || areRecentProjectsLoading || isDataLoading) {
+    if (isLoading) {
         return (
             <>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

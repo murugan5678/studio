@@ -119,9 +119,10 @@ const projectStats = useMemo(() => {
 
     // Determine the latest result for each test case
     (executionRuns || []).forEach(run => {
+        if (!run.createdAt || typeof run.createdAt.toMillis !== 'function') return;
         run.results.forEach(result => {
             const existing = latestResults.get(result.testCaseId);
-            if (!existing || (run.createdAt?.toMillis() > existing.executionDate?.toMillis())) {
+            if (!existing || (existing.executionDate && typeof existing.executionDate.toMillis === 'function' && run.createdAt.toMillis() > existing.executionDate.toMillis())) {
                 latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
             }
         });
@@ -195,10 +196,10 @@ const projectStats = useMemo(() => {
   ];
 
   const chartData = useMemo(() => {
-    const monthlyData: { [key: string]: { passed: number; failed: number; blocked: number; deferred: number; "Can't Test": number; } } = {};
+    const monthlyData: { [key: string]: { [status: string]: number } } = {};
     
     (executionRuns || []).forEach(run => {
-        if (!run.createdAt) return;
+        if (!run.createdAt || typeof run.createdAt.toDate !== 'function') return;
         const date = run.createdAt.toDate();
         const month = date.toLocaleString('default', { month: 'short' });
         
@@ -207,15 +208,22 @@ const projectStats = useMemo(() => {
         }
 
         run.results.forEach(result => {
-            if (result.status === 'Passed') monthlyData[month].passed++;
-            else if (result.status === 'Failed') monthlyData[month].failed++;
-            else if (result.status === 'Blocked') monthlyData[month].blocked++;
-            else if (result.status === 'Deferred') monthlyData[month].deferred++;
-            else if (result.status === "Can't Test") monthlyData[month]["Can't Test"]++;
-        })
+            if (monthlyData[month].hasOwnProperty(result.status)) {
+                monthlyData[month][result.status]++;
+            }
+        });
     });
 
-    return Object.entries(monthlyData).map(([date, counts]) => ({ date, ...counts }));
+    const months = Array.from({length: 6}, (_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        return d.toLocaleString('default', { month: 'short' });
+    }).reverse();
+
+    return months.map(month => ({
+        date: month,
+        ...monthlyData[month]
+    }));
 
   }, [executionRuns]);
 
@@ -280,6 +288,7 @@ const projectStats = useMemo(() => {
             <CardDescription>Total test results over the last months for this project.</CardDescription>
         </CardHeader>
         <CardContent>
+        {executionRuns && executionRuns.length > 0 ? (
         <ChartContainer config={chartConfig} className="h-[250px] w-full">
               <BarChart accessibilityLayer data={chartData}>
                 <CartesianGrid vertical={false} />
@@ -288,7 +297,7 @@ const projectStats = useMemo(() => {
                   tickLine={false}
                   tickMargin={10}
                   axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
+                  tickFormatter={(value) => value}
                 />
                 <ChartTooltip
                   cursor={false}
@@ -301,6 +310,11 @@ const projectStats = useMemo(() => {
                 <Bar dataKey="Can't Test" fill="var(--color-Can't Test)" radius={4} stackId="a" />
               </BarChart>
             </ChartContainer>
+            ) : (
+                <div className="flex h-[250px] w-full items-center justify-center text-center">
+                    <p className="text-muted-foreground">No execution history to display.</p>
+                </div>
+            )}
         </CardContent>
       </Card>
 
@@ -468,17 +482,68 @@ const projectStats = useMemo(() => {
         </TabsContent>
         <TabsContent value="executions">
           <Card>
-              <CardHeader>
-                  <CardTitle>Executions</CardTitle>
-                  <CardDescription>
-                      This feature is not implemented yet. Redirecting to the list of all executions.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <Button onClick={() => router.push(`/projects/${params.projectId}/executions`)}>
-                      View Project Executions
-                  </Button>
-              </CardContent>
+            <CardHeader className='flex-row items-center justify-between'>
+                <div>
+                    <CardTitle>Test Executions</CardTitle>
+                    <CardDescription>Execution history for this project.</CardDescription>
+                </div>
+            </CardHeader>
+            <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Run Title</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Results</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Bugs</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {areExecutionsLoading && (
+                        <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center">
+                                Loading execution runs...
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {!areExecutionsLoading && executionRuns && executionRuns.length > 0 ? (
+                        executionRuns.map(run => {
+                            const stats = getRunStats(run);
+                            return (
+                                <TableRow key={run.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/projects/${params.projectId}/executions/${run.id}`)}>
+                                    <TableCell className="font-medium">{run.title}</TableCell>
+                                    <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
+                                    <TableCell>
+                                        {stats.passed} Passed, {stats.failed} Failed ({stats.total} total)
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant={stats.failed > 0 ? 'destructive' : 'secondary'}>
+                                            {stats.failed > 0 ? 'Failed' : 'Passed'}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        {stats.hasBugs && (
+                                            <Link href={`/projects/${params.projectId}/executions/${run.id}`} className="flex items-center text-primary hover:underline">
+                                                <Bug className="h-4 w-4" />
+                                            </Link>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })
+                    ) : (
+                        !areExecutionsLoading && (
+                            <TableRow>
+                                <TableCell colSpan={5} className="h-24 text-center">
+                                    No execution runs yet.
+                                </TableCell>
+                            </TableRow>
+                        )
+                    )}
+                </TableBody>
+            </Table>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

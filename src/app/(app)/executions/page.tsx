@@ -30,12 +30,22 @@ export default function ExecutionsPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!user || !firestore) return;
+        if (!user || !firestore) {
+            setIsLoading(false);
+            return;
+        }
 
         const fetchAllExecutions = async () => {
             setIsLoading(true);
             const projectsRef = collection(firestore, `users/${user.uid}/projects`);
             const projectsSnap = await getDocs(projectsRef);
+
+            if (projectsSnap.empty) {
+                setAllRuns([]);
+                setIsLoading(false);
+                return;
+            }
+
             const projects = projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
             const projectMap = new Map(projects.map(p => [p.id, p.name]));
 
@@ -55,7 +65,11 @@ export default function ExecutionsPage() {
             const runsByProject = await Promise.all(allRunsPromises);
             const flattenedRuns = runsByProject.flat();
 
-            setAllRuns(flattenedRuns.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+            if (flattenedRuns.length > 0 && flattenedRuns[0].createdAt) {
+                flattenedRuns.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            }
+
+            setAllRuns(flattenedRuns);
             setIsLoading(false);
         };
 
@@ -134,7 +148,7 @@ export default function ExecutionsPage() {
                                                 {run.projectName}
                                             </Link>
                                         </TableCell>
-                                        <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
+                                        <TableCell>{run.createdAt?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
                                         <TableCell>
                                             {stats.passed} Passed, {stats.failed} Failed ({stats.total} total)
                                         </TableCell>

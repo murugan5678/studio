@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/chart';
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, XAxis } from 'recharts';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, getDocs, query } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import type { Project, TestCase, TestExecutionRun, Defect } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,8 +56,10 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
+        if (areProjectsLoading) return;
         if (!projects || !user || !firestore) {
-            if(!areProjectsLoading) setIsLoading(false);
+            setIsLoading(false);
+            setAggregatedData({ testCases: [], executions: [], defects: [] });
             return;
         }
 
@@ -67,7 +69,7 @@ export default function ExecutiveDashboardPage() {
                 ? projects 
                 : projects.filter(p => p.id === selectedProjectId);
 
-            if (!projectsToFetch) {
+            if (!projectsToFetch || projectsToFetch.length === 0) {
                 setAggregatedData({ testCases: [], executions: [], defects: [] });
                 setIsLoading(false);
                 return;
@@ -78,14 +80,14 @@ export default function ExecutiveDashboardPage() {
             const allDefects: Defect[] = [];
 
             for (const project of projectsToFetch) {
-                const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`));
+                const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
                 const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
                 const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
 
                 const [tcSnap, execSnap, defectSnap] = await Promise.all([
                     getDocs(tcQuery),
                     getDocs(execQuery),
-                    getDocs(defectQuery),
+                    getDocs(defectSnap),
                 ]);
 
                 allTestCases.push(...tcSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
@@ -137,12 +139,14 @@ export default function ExecutiveDashboardPage() {
 
         // --- Risk & Readiness ---
         let riskLevel = "Low";
-        if (openHighSeverityDefects > 5 || qualityHealthScore < 70) riskLevel = "Medium";
-        if (openHighSeverityDefects > 10 || qualityHealthScore < 50) riskLevel = "High";
+        if (openHighSeverityDefects > 5 || (testCases.length > 0 && qualityHealthScore < 70)) riskLevel = "Medium";
+        if (openHighSeverityDefects > 10 || (testCases.length > 0 && qualityHealthScore < 50)) riskLevel = "High";
+        if (testCases.length === 0) riskLevel = "N/A";
         
         let releaseReadiness = "Ready";
         if (riskLevel === "Medium") releaseReadiness = "At Risk";
         if (riskLevel === "High") releaseReadiness = "Blocked";
+        if (testCases.length === 0) releaseReadiness = "N/A";
 
         // --- Flaky Test Detection (Simplified) ---
         const testExecutionStats: { [key: string]: { passes: number, fails: number }} = {};
@@ -172,7 +176,7 @@ export default function ExecutiveDashboardPage() {
         });
 
         return {
-            qualityHealthScore,
+            qualityHealthScore: testCases.length > 0 ? qualityHealthScore : null,
             riskLevel,
             releaseReadiness,
             flakyTests: flakyTests.sort((a,b) => b.failureRate - a.failureRate).slice(0, 5),
@@ -182,8 +186,8 @@ export default function ExecutiveDashboardPage() {
 
     // Dummy data for chart until real historical data is implemented
     const healthScoreData = [
-        { month: "Jan", score: 75 }, { month: "Feb", score: 78 }, { month: "Mar", score: 82 },
-        { month: "Apr", score: 80 }, { month: "May", score: 85 }, { month: "Jun", score: executiveMetrics?.qualityHealthScore ?? 0 },
+        { month: "Jan", score: 0 }, { month: "Feb", score: 0 }, { month: "Mar", score: 0 },
+        { month: "Apr", score: 0 }, { month: "May", score: 0 }, { month: "Jun", score: executiveMetrics?.qualityHealthScore ?? 0 },
     ]
 
     if (isLoading || areProjectsLoading) {
@@ -214,7 +218,7 @@ export default function ExecutiveDashboardPage() {
                     <p className="text-muted-foreground">A high-level overview of quality, risk, and release readiness.</p>
                 </div>
                 <div className="w-64">
-                    <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                    <Select value={selectedProjectId} onValueChange={setSelectedProjectId} disabled={!projects || projects.length === 0}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a project" />
                         </SelectTrigger>
@@ -237,7 +241,7 @@ export default function ExecutiveDashboardPage() {
                     <CardContent className="flex flex-col items-center">
                         <div className="flex items-baseline">
                             <p className="text-7xl font-bold">{qualityHealthScore ?? 'N/A'}</p>
-                            <span className="text-2xl text-muted-foreground">/100</span>
+                            {qualityHealthScore !== null && <span className="text-2xl text-muted-foreground">/100</span>}
                         </div>
                          {/* This part needs historical data to be meaningful */}
                         <div className="mt-2 flex items-center text-muted-foreground font-semibold">
@@ -279,6 +283,11 @@ export default function ExecutiveDashboardPage() {
                         <CardDescription>Project quality health score trend for the last 6 releases (placeholder data).</CardDescription>
                     </CardHeader>
                     <CardContent>
+                    {qualityHealthScore === null ? (
+                        <div className="flex h-[250px] w-full items-center justify-center text-center">
+                            <p className="text-muted-foreground">No data to display.</p>
+                        </div>
+                    ) : (
                         <ChartContainer config={chartConfig} className="h-[250px] w-full">
                             <RechartsBarChart accessibilityLayer data={healthScoreData}>
                                 <CartesianGrid vertical={false} />
@@ -295,6 +304,7 @@ export default function ExecutiveDashboardPage() {
                                 <Bar dataKey="score" fill="var(--color-score)" radius={4} />
                             </RechartsBarChart>
                         </ChartContainer>
+                    )}
                     </CardContent>
                 </Card>
 

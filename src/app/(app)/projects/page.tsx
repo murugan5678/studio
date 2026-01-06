@@ -26,7 +26,7 @@ import { PlusCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import type { Project, TestExecutionRun } from '@/lib/types';
+import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -59,10 +59,21 @@ export default function ProjectsPage() {
   const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
   useEffect(() => {
+    if (areProjectsLoading) {
+      setIsStatsLoading(true);
+      return;
+    }
     if (!projects || !user || !firestore) {
-      if(!areProjectsLoading) setIsStatsLoading(false);
+      setIsStatsLoading(false);
+      setProjectsWithStats([]);
       return;
     };
+
+    if (projects.length === 0) {
+        setIsStatsLoading(false);
+        setProjectsWithStats([]);
+        return;
+    }
 
     setIsStatsLoading(true);
     const fetchStatsForProjects = async () => {
