@@ -43,7 +43,7 @@ export function RecentProjects({ projects }: RecentProjectsProps) {
                 {projects.map((project) => (
                 <TableRow key={project.id}>
                     <TableCell>
-                    <div className="font-medium">{project.name}</div>
+                    <Link href={`/projects/${project.id}`} className="font-medium hover:underline">{project.name}</Link>
                     <div className="hidden text-sm text-muted-foreground md:inline">
                         {project.description}
                     </div>
