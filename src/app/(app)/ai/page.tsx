@@ -6,19 +6,19 @@ import Link from 'next/link';
 const aiTools = [
     {
         title: 'AI Scenario Generator',
-        description: 'Upload a file (screenshot, doc) or provide a text description/link to have AI generate test scenarios for you.',
+        description: 'Generate high-level test scenarios from an input.',
         icon: Lightbulb,
         href: '/ai/scenario-generator'
     },
     {
         title: 'AI Test Case Generator',
-        description: 'Based on a scenario, screenshot, or Figma link, the AI will create detailed test cases for your review.',
+        description: 'Create detailed, structured test cases from a scenario.',
         icon: TestTube,
         href: '/ai/test-case-generator'
     },
     {
         title: 'AI Script Generator',
-        description: 'Select test cases from a project and a framework to generate an automation script.',
+        description: 'Generate an automation script from selected test cases.',
         icon: Bot,
         href: '/ai/script-generator'
     }
@@ -31,7 +31,7 @@ export default function AiToolsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">AI Generation Tools</h1>
                 <p className="text-muted-foreground">Leverage AI to accelerate your testing workflow.</p>
             </div>
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
                 {aiTools.map(tool => (
                      <Link href={tool.href} key={tool.title}>
                         <Card className='h-full hover:border-primary transition-colors'>
