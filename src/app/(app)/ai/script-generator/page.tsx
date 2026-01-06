@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-import type { TestCase } from '@/lib/types';
+import { collection, query, where } from 'firebase/firestore';
+import type { TestCase, Project } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,34 +29,55 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { generateAutomationScript, type AutomationScriptInput } from '@/ai/ai-automation-script-generation';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Bot, Copy } from 'lucide-react';
+import { Bot, Copy, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
+  projectId: z.string().min(1, { message: 'Please select a project.' }),
   testCaseIds: z.array(z.string()).min(1, { message: 'Please select at least one test case.' }),
   automationFramework: z.enum(['Playwright', 'Cypress', 'Selenium']),
 });
 
-export default function AiScriptGeneratorPage({ params }: { params: { projectId: string } }) {
+export default function AiScriptGeneratorPage() {
+  const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
   const [generatedScript, setGeneratedScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+
+  const projectsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, `users/${user.uid}/projects`);
+  }, [user, firestore]);
 
   const testCasesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
-  }, [user, firestore, params.projectId]);
+    if (!user || !firestore || !selectedProjectId) return null;
+    return collection(firestore, `users/${user.uid}/projects/${selectedProjectId}/testCases`);
+  }, [user, firestore, selectedProjectId]);
 
+  const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      projectId: '',
       testCaseIds: [],
       automationFramework: 'Playwright',
     },
   });
+
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'projectId') {
+        setSelectedProjectId(value.projectId || '');
+        form.reset({ ...value, testCaseIds: [] });
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!testCases) return;
@@ -101,15 +122,43 @@ export default function AiScriptGeneratorPage({ params }: { params: { projectId:
   };
 
   return (
-    <div className="grid gap-8 md:grid-cols-2">
+    <div className='grid gap-6'>
+      <div className='flex justify-start'>
+          <Button variant="outline" onClick={() => router.back()}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+          </Button>
+       </div>
+        <div className="grid gap-8 md:grid-cols-2">
       <Card>
         <CardHeader>
           <CardTitle>AI Automation Script Generator</CardTitle>
-          <CardDescription>Select test cases and a framework to generate an automation script.</CardDescription>
+          <CardDescription>Select a project, test cases, and a framework to generate an automation script.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="projectId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={areProjectsLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a project" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <FormField
                 control={form.control}
                 name="testCaseIds"
@@ -119,8 +168,10 @@ export default function AiScriptGeneratorPage({ params }: { params: { projectId:
                     <Card className='p-4'>
                       <ScrollArea className="h-72">
                       {areTestCasesLoading ? (
-                        <p>Loading test cases...</p>
-                      ) : (
+                        <p className='text-muted-foreground text-sm'>Loading test cases...</p>
+                      ) : !selectedProjectId ? (
+                        <p className='text-muted-foreground text-sm'>Please select a project first.</p>
+                      ): (
                         testCases?.map((item) => (
                           <FormField
                             key={item.id}
@@ -223,6 +274,8 @@ export default function AiScriptGeneratorPage({ params }: { params: { projectId:
           )}
         </CardContent>
       </Card>
+    </div>
+
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, Bot, PlayCircle, Download, Lightbulb } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -211,11 +211,6 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                 <TabsTrigger value="executions">Test Execution</TabsTrigger>
             </TabsList>
             <div className='flex items-center gap-2'>
-                 <Button asChild variant="outline">
-                    <Link href={`/projects/${params.projectId}/ai-scenario-generator`}>
-                        <Lightbulb className="mr-2 h-4 w-4" /> AI Scenario Generator
-                    </Link>
-                </Button>
                 <Button asChild variant="outline">
                     <Link href={`/projects/${params.projectId}/upload-test-cases`}>
                         <Upload className="mr-2 h-4 w-4" /> Upload Cases
@@ -223,11 +218,6 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                 </Button>
                  <Button variant="outline" onClick={handleDownloadTemplate}>
                     <Download className="mr-2 h-4 w-4" /> Download Template
-                </Button>
-                 <Button asChild variant="outline">
-                    <Link href={`/projects/${params.projectId}/ai-script-generator`}>
-                        <Bot className="mr-2 h-4 w-4" /> AI Script Generator
-                    </Link>
                 </Button>
                 <Button asChild>
                     <Link href={`/projects/${params.projectId}/new-test-case`}>

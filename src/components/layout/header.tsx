@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link';
-import { PanelLeft, Beaker, Folder, Home, Settings, BarChart } from 'lucide-react';
+import { PanelLeft, Beaker, Folder, Home, Settings, BarChart, Bot } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,6 +20,7 @@ const navItems = [
     { href: '/dashboard', icon: Home, label: 'Dashboard' },
     { href: '/projects', icon: Folder, label: 'Projects' },
     { href: '/executions', icon: Beaker, label: 'Executions' },
+    { href: '/ai/scenario-generator', icon: Bot, label: 'AI Generation' },
     { href: '/analytics', icon: BarChart, label: 'Analytics' },
     { href: '/settings', icon: Settings, label: 'Settings' },
 ]
@@ -71,10 +72,10 @@ export function Header() {
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
                     {index === pathSegments.length - 1 ? (
-                        <BreadcrumbPage className="capitalize">{segment}</BreadcrumbPage>
+                        <BreadcrumbPage className="capitalize">{segment.replace(/-/g, ' ')}</BreadcrumbPage>
                     ) : (
                         <BreadcrumbLink asChild>
-                            <Link href={`/${pathSegments.slice(0, index + 1).join('/')}`} className="capitalize">{segment}</Link>
+                            <Link href={`/${pathSegments.slice(0, index + 1).join('/')}`} className="capitalize">{segment.replace(/-/g, ' ')}</Link>
                         </BreadcrumbLink>
                     )}
                 </BreadcrumbItem>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useFirestore, useUser } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
@@ -18,9 +18,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Lightbulb, Loader2, Sparkles } from 'lucide-react';
-import { generateTestScenarios, type GenerateTestScenariosOutput, type GenerateTestScenariosInput } from '@/ai/flows/ai-test-scenario-generation';
+import { generateTestScenarios, type GenerateTestScenariosOutput } from '@/ai/flows/ai-test-scenario-generation';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Project } from '@/lib/types';
+
 
 const formSchema = z.object({
+  projectId: z.string().min(1, { message: "Please select a project." }),
   textInput: z.string().optional(),
   fileInput: z.instanceof(File).optional(),
 }).refine(data => data.textInput || data.fileInput, {
@@ -29,6 +33,7 @@ const formSchema = z.object({
 });
 
 type GeneratedTestCase = GenerateTestScenariosOutput['testCases'][0];
+type GenerateTestScenariosInput = { inputData: string };
 
 function fileToDataUri(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -39,7 +44,7 @@ function fileToDataUri(file: File): Promise<string> {
     });
 }
 
-export default function AiScenarioGeneratorPage({ params }: { params: { projectId: string } }) {
+export default function AiScenarioGeneratorPage() {
   const router = useRouter();
   const { user } = useUser();
   const firestore = useFirestore();
@@ -47,6 +52,13 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
 
   const [generatedCases, setGeneratedCases] = useState<GeneratedTestCase[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  const projectsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return collection(firestore, `users/${user.uid}/projects`);
+  }, [user, firestore]);
+
+  const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -85,11 +97,15 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
   }
 
   async function handleSaveCases() {
-    if (!user || !firestore || generatedCases.length === 0) return;
+    const projectId = form.getValues('projectId');
+    if (!user || !firestore || !projectId || generatedCases.length === 0) {
+        toast({ variant: 'destructive', title: 'Save Failed', description: 'Please select a project and generate cases first.' });
+        return;
+    }
     
     setIsGenerating(true); // Reuse loading state for saving
 
-    const testCasesCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
+    const testCasesCollection = collection(firestore, `users/${user.uid}/projects/${projectId}/testCases`);
     const batch = writeBatch(firestore);
 
     generatedCases.forEach(tc => {
@@ -97,7 +113,7 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
         const newTestCase = {
             ...tc,
             id: docRef.id,
-            projectId: params.projectId,
+            projectId: projectId,
             createdBy: user.uid,
             createdAt: serverTimestamp(),
             testSteps: Array.isArray(tc.testSteps) ? tc.testSteps.join('\\n') : tc.testSteps,
@@ -112,7 +128,7 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
             title: 'Test Cases Saved!',
             description: `${generatedCases.length} test cases have been added to your project.`,
         });
-        router.push(`/projects/${params.projectId}`);
+        router.push(`/projects/${projectId}`);
     } catch (error) {
         console.error("Error saving test cases:", error);
         toast({
@@ -127,7 +143,7 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
 
   return (
     <div className="grid gap-6">
-        <div className='flex justify-start'>
+      <div className='flex justify-start'>
           <Button variant="outline" onClick={() => router.back()}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back
@@ -141,6 +157,26 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="projectId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={areProjectsLoading}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a project to add cases to" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="textInput"
@@ -171,7 +207,7 @@ export default function AiScenarioGeneratorPage({ params }: { params: { projectI
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={isGenerating} className="w-full">
+              <Button type="submit" disabled={isGenerating || areProjectsLoading} className="w-full">
                 {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
                 {isGenerating ? 'Generating...' : 'Generate Scenarios'}
               </Button>
