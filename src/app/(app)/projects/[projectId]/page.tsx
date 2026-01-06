@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2, Ban, ShieldAlert } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2, Ban, ShieldAlert, Bug } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -164,7 +164,8 @@ export default function ProjectDetailsPage() {
     const passed = run.results.filter(r => r.status === 'Passed').length;
     const failed = run.results.filter(r => r.status === 'Failed').length;
     const total = run.results.length;
-    return { passed, failed, total };
+    const hasBugs = run.results.some(r => r.bugLink);
+    return { passed, failed, total, hasBugs };
   };
 
   const kpiData = [
@@ -445,12 +446,13 @@ export default function ProjectDetailsPage() {
                             <TableHead>Date</TableHead>
                             <TableHead>Results</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Bugs</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {areExecutionsLoading && (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">
+                                <TableCell colSpan={5} className="h-24 text-center">
                                     Loading execution runs...
                                 </TableCell>
                             </TableRow>
@@ -470,13 +472,20 @@ export default function ProjectDetailsPage() {
                                                 {stats.failed > 0 ? 'Failed' : 'Passed'}
                                             </Badge>
                                         </TableCell>
+                                        <TableCell>
+                                            {stats.hasBugs && (
+                                                <Link href={`/projects/${params.projectId}/executions/${run.id}`} className="flex items-center text-primary hover:underline">
+                                                    <Bug className="h-4 w-4" />
+                                                </Link>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 )
                             })
                         ) : (
                             !areExecutionsLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         No execution runs yet.
                                     </TableCell>
                                 </TableRow>
