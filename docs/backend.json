@@ -351,6 +351,50 @@
             "endDate": {"type": "string", "format": "date-time"}
         },
         "required": ["id", "name", "projectId", "startDate", "endDate"]
+    },
+    "QualityGateConfig": {
+      "title": "QualityGateConfig",
+      "type": "object",
+      "description": "Configuration for a project's quality gate.",
+      "properties": {
+        "id": {"type": "string"},
+        "projectId": {"type": "string"},
+        "minPassPercentage": {"type": "number"},
+        "maxCriticalBugs": {"type": "number"},
+        "maxHighBugs": {"type": "number"},
+        "maxMediumBugs": {"type": "number"}
+      },
+      "required": ["id", "projectId", "minPassPercentage", "maxCriticalBugs", "maxHighBugs", "maxMediumBugs"]
+    },
+    "DeploymentApproval": {
+        "title": "DeploymentApproval",
+        "type": "object",
+        "description": "Represents the deployment approval status for a project.",
+        "properties": {
+            "id": {"type": "string"},
+            "projectId": {"type": "string"},
+            "status": {"type": "string", "enum": ["Not Ready", "Ready for Production", "Approved for Deployment", "Blocked"]},
+            "approvedBy": {"type": "string"},
+            "approvedAt": {"type": "string", "format": "date-time"},
+            "comments": {"type": "string"},
+            "history": {
+                "type": "array",
+                "items": { "$ref": "#/backend/entities/DeploymentApprovalHistory" }
+            }
+        },
+        "required": ["id", "projectId", "status", "history"]
+    },
+    "DeploymentApprovalHistory": {
+        "title": "DeploymentApprovalHistory",
+        "type": "object",
+        "description": "An audit log entry for a deployment approval change.",
+        "properties": {
+            "status": {"type": "string"},
+            "changedBy": {"type": "string"},
+            "changedAt": {"type": "string", "format": "date-time"},
+            "comment": {"type": "string"}
+        },
+        "required": ["status", "changedBy", "changedAt"]
     }
   },
   "auth": {
@@ -486,6 +530,22 @@
         }
       },
       {
+        "path": "/users/{userId}/projects/{projectId}/qualityGateConfig/{configId}",
+        "definition": {
+          "entityName": "QualityGateConfig",
+          "schema": { "$ref": "#/backend/entities/QualityGateConfig" },
+          "description": "Stores the quality gate configuration for a project."
+        }
+      },
+      {
+        "path": "/users/{userId}/projects/{projectId}/deploymentApproval/{approvalId}",
+        "definition": {
+          "entityName": "DeploymentApproval",
+          "schema": { "$ref": "#/backend/entities/DeploymentApproval" },
+          "description": "Stores the deployment approval status for a project."
+        }
+      },
+      {
         "path": "/tags/{tagId}",
         "definition": {
           "entityName": "Tag",
@@ -502,7 +562,7 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to prioritize authorization independence, clarity, and scalability. It leverages path-based ownership for user-related data and employs denormalization to avoid `get()` calls in security rules, thus ensuring atomic operations and simplifying debugging. The structure supports secure `list` operations through structural segregation, maintaining a homogeneous security posture within each collection.\n\nSpecifically, the `/users/{userId}` collection stores user profiles. Projects are stored in `/users/{userId}/projects/{projectId}`, establishing clear ownership and eliminating the need to check user roles during project access. Test cases, test executions, automation scripts, defects, and releases follow a similar pattern, residing under their respective projects, thereby ensuring that access to these resources is implicitly controlled by project ownership. Tags are stored globally under `/tags/{tagId}` since they are not user-specific and are intended to be shared across the application.\n\nThis design ensures Authorization Independence by nesting project-related data under the user's path, inherently linking project ownership to the user's ID.  QAPs are supported through segregation: the path structure itself enforces that only the owner can list projects they own, test cases they own, etc. There are no `get()` calls to a parent document needed to determine access; the path dictates authorization. Global tags don't require user-specific authorization, so are stored in a separate collection.\n\nThis structure avoids complex security rules and ensures data integrity by enforcing clear ownership and consistent access patterns."
+    "reasoning": "The Firestore structure is designed to prioritize authorization independence, clarity, and scalability. It leverages path-based ownership for user-related data and employs denormalization to avoid `get()` calls in security rules, thus ensuring atomic operations and simplifying debugging. The structure supports secure `list` operations through structural segregation, maintaining a homogeneous security posture within each collection.\n\nSpecifically, the `/users/{userId}` collection stores user profiles. Projects are stored in `/users/{userId}/projects/{projectId}`, establishing clear ownership and eliminating the need to check user roles during project access. Test cases, test executions, automation scripts, defects, releases, quality gate configurations, and deployment approvals follow a similar pattern, residing under their respective projects, thereby ensuring that access to these resources is implicitly controlled by project ownership. Tags are stored globally under `/tags/{tagId}` since they are not user-specific and are intended to be shared across the application.\n\nThis design ensures Authorization Independence by nesting project-related data under the user's path, inherently linking project ownership to the user's ID.  QAPs are supported through segregation: the path structure itself enforces that only the owner can list projects they own, test cases they own, etc. There are no `get()` calls to a parent document needed to determine access; the path dictates authorization. Global tags don't require user-specific authorization, so are stored in a separate collection.\n\nThis structure avoids complex security rules and ensures data integrity by enforcing clear ownership and consistent access patterns."
   }
 }
     

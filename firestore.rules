@@ -212,6 +212,28 @@ service cloud.firestore {
           allow update: if isExistingOwner(userId);
           allow delete: if isExistingOwner(userId);
         }
+
+        //---------------------------------------------------------------------
+        // Quality Gate Config (/users/{userId}/projects/{projectId}/qualityGateConfig/{configId})
+        //---------------------------------------------------------------------
+        match /qualityGateConfig/{configId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
+
+        //---------------------------------------------------------------------
+        // Deployment Approval (/users/{userId}/projects/{projectId}/deploymentApproval/{approvalId})
+        //---------------------------------------------------------------------
+        match /deploymentApproval/{approvalId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
       }
     }
 

@@ -90,5 +90,31 @@ export interface RTMEntry {
     testExecutionId?: string;
     defectId?: string;
 }
+
+export interface QualityGateConfig {
+    id: string;
+    projectId: string;
+    minPassPercentage: number;
+    maxCriticalBugs: number;
+    maxHighBugs: number;
+    maxMediumBugs: number;
+}
+
+export interface DeploymentApproval {
+    id: string;
+    projectId: string;
+    status: 'Not Ready' | 'Ready for Production' | 'Approved for Deployment' | 'Blocked';
+    approvedBy?: string;
+    approvedAt?: Timestamp;
+    comments?: string;
+    history: DeploymentApprovalHistory[];
+}
+
+export interface DeploymentApprovalHistory {
+    status: 'Not Ready' | 'Ready for Production' | 'Approved for Deployment' | 'Blocked';
+    changedBy: string;
+    changedAt: Timestamp;
+    comment?: string;
+}
     
     

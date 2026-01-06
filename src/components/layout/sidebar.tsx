@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AppLogo } from '@/components/icons';
-import { LayoutDashboard, Beaker, Folder, Settings, BarChart, Bot, Shield } from 'lucide-react';
+import { LayoutDashboard, Beaker, Folder, Settings, Shield, Bot, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
     { href: '/projects', icon: Folder, label: 'Projects' },
     { href: '/executions', icon: Beaker, label: 'Executions' },
     { href: '/executive', icon: Shield, label: 'Executive' },
+    { href: '/quality-gates', icon: ClipboardCheck, label: 'Quality Gates' },
     { href: '/ai', icon: Bot, label: 'AI Generation' },
 ]
 
