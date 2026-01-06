@@ -1,7 +1,7 @@
 'use client';
 
-import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
-import { collectionGroup, getDocs, query, where } from 'firebase/firestore';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import type { TestExecutionRun, Project } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -37,19 +37,23 @@ export default function ExecutionsPage() {
             const projects = projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
             const projectMap = new Map(projects.map(p => [p.id, p.name]));
 
-            const runs: FullExecutionRun[] = [];
-            const executionRunsQuery = query(collectionGroup(firestore, 'testExecutions'), where('userId', '==', user.uid));
-            const executionRunsSnap = await getDocs(executionRunsQuery);
-            
-            executionRunsSnap.forEach(doc => {
-                const run = doc.data() as TestExecutionRun;
-                runs.push({
-                    ...run,
-                    projectName: projectMap.get(run.projectId) || 'Unknown Project'
+            const allRunsPromises = projects.map(async (project) => {
+                const executionsRef = collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`);
+                const executionsSnap = await getDocs(executionsRef);
+                return executionsSnap.docs.map(doc => {
+                    const run = doc.data() as TestExecutionRun;
+                    return {
+                        ...run,
+                        id: doc.id,
+                        projectName: projectMap.get(run.projectId) || 'Unknown Project'
+                    } as FullExecutionRun;
                 });
             });
 
-            setAllRuns(runs.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
+            const runsByProject = await Promise.all(allRunsPromises);
+            const flattenedRuns = runsByProject.flat();
+
+            setAllRuns(flattenedRuns.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis()));
             setIsLoading(false);
         };
 
