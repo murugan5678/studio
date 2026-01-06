@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -28,7 +28,7 @@ const formSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 });
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -44,13 +44,17 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      toast({
+        title: 'Account Created',
+        description: "You've been successfully signed up! Redirecting...",
+      });
       router.push('/dashboard');
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('Signup error:', error);
       toast({
         variant: 'destructive',
-        title: 'Login Failed',
+        title: 'Sign Up Failed',
         description: error.message || 'An unknown error occurred. Please try again.',
       });
     } finally {
@@ -60,14 +64,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-        <div className="mb-8 flex items-center gap-2 text-2xl font-bold text-primary">
-            <AppLogo className="h-8 w-8" />
-            <h1 className="font-headline text-3xl font-bold">TestAI</h1>
-        </div>
+      <div className="mb-8 flex items-center gap-2 text-2xl font-bold text-primary">
+        <AppLogo className="h-8 w-8" />
+        <h1 className="font-headline text-3xl font-bold">TestAI</h1>
+      </div>
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl font-headline">Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account.</CardDescription>
+          <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
+          <CardDescription>Enter your details to get started.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -99,15 +103,15 @@ export default function LoginPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? 'Signing In...' : 'Sign In'}
+                {isLoading ? 'Creating Account...' : 'Sign Up'}
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex justify-center text-sm">
-          <p>Don&apos;t have an account?&nbsp;</p>
-          <Link href="/signup" className="font-semibold text-primary hover:underline">
-            Sign Up
+          <p>Already have an account?&nbsp;</p>
+          <Link href="/login" className="font-semibold text-primary hover:underline">
+            Login
           </Link>
         </CardFooter>
       </Card>
