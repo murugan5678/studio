@@ -24,7 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { collection, serverTimestamp, where, query } from 'firebase/firestore';
 import type { TestCase, TestExecutionRun } from '@/lib/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -74,7 +74,7 @@ export default function NewExecutionPage() {
 
   const testCasesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
+    return query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`), where('status', '==', 'Approved'));
   }, [user, firestore, params.projectId]);
 
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
