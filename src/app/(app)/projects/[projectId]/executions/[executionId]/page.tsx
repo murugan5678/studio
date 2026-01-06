@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Paperclip } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -21,10 +21,11 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
     "Can't Test": 'outline'
 };
 
-export default function ExecutionDetailsPage({ params }: { params: { projectId: string, executionId: string } }) {
+export default function ExecutionDetailsPage() {
     const { user } = useUser();
     const firestore = useFirestore();
     const router = useRouter();
+    const params = useParams() as { projectId: string, executionId: string };
 
     const executionRunRef = useMemoFirebase(() => {
         if (!user || !firestore) return null;
@@ -121,7 +122,7 @@ export default function ExecutionDetailsPage({ params }: { params: { projectId: 
                                                                 <Image 
                                                                     src={link} 
                                                                     alt={`Evidence ${i + 1}`} 
-                                                                    layout="fill"
+                                                                    fill
                                                                     objectFit="cover"
                                                                     className="rounded-md hover:opacity-80 transition-opacity"
                                                                 />
