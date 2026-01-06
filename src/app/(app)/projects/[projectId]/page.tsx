@@ -175,13 +175,16 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                                 <TableHead>Title</TableHead>
                                 <TableHead>Module</TableHead>
                                 <TableHead>Priority</TableHead>
+                                <TableHead>Severity</TableHead>
+                                <TableHead>Team</TableHead>
+                                <TableHead>Automation</TableHead>
                                 <TableHead>Type</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                            {areTestCasesLoading && (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={8} className="h-24 text-center">
                                     Loading test cases...
                                 </TableCell>
                             </TableRow>
@@ -195,13 +198,20 @@ export default function ProjectDetailsPage({ params }: { params: { projectId: st
                                         <TableCell>
                                             <Badge variant={priorityVariant[tc.priority]}>{tc.priority}</Badge>
                                         </TableCell>
+                                        <TableCell>{tc.severity}</TableCell>
+                                        <TableCell>{tc.team || 'N/A'}</TableCell>
+                                        <TableCell>
+                                          <Badge variant={tc.automationFeasibility === 'Automatable' ? 'secondary' : 'outline'}>
+                                            {tc.automationFeasibility}
+                                          </Badge>
+                                        </TableCell>
                                         <TableCell>{tc.type}</TableCell>
                                     </TableRow>
                                 ))
                            ) : (
                             !areTestCasesLoading && (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
+                                    <TableCell colSpan={8} className="h-24 text-center">
                                         No test cases yet. Start by creating one.
                                     </TableCell>
                                 </TableRow>
