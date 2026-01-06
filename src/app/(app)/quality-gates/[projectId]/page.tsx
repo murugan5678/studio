@@ -1,24 +1,49 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useUser, useFirestore, useMemoFirebase, useDoc, setDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, serverTimestamp, getDocs } from 'firebase/firestore';
-import type { Project, QualityGateConfig, DeploymentApproval, DeploymentApprovalHistory } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, X, ShieldCheck, Ban, HelpCircle } from 'lucide-react';
-import { useRouter, useParams } from 'next/navigation';
-import { useMemo, useState, useEffect } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Check, X, ShieldCheck, Ban, HelpCircle } from 'lucide-react';
+import { useRouter, useParams } from 'next/navigation';
+import { useMemo, useState, useEffect } from 'react';
 
+// --- Dummy Data ---
+const dummyProject = { id: 'proj_1', name: 'Phoenix Project' };
+const dummyGateConfig = {
+  id: 'proj_1',
+  projectId: 'proj_1',
+  minPassPercentage: 95,
+  maxCriticalBugs: 0,
+  maxHighBugs: 2,
+  maxMediumBugs: 10,
+};
+const dummyMetrics = {
+    passPercentage: 98,
+    openBugs: { critical: 0, high: 1, medium: 5 }
+};
+const dummyApproval = {
+    id: 'proj_1',
+    projectId: 'proj_1',
+    status: 'Ready for Production' as const,
+    history: [
+        {
+            status: 'Ready for Production' as const,
+            changedBy: 'system@test.ai',
+            changedAt: new Date(),
+            comment: 'Initial state'
+        }
+    ]
+};
+// --- End Dummy Data ---
 
 const qualityGateSchema = z.object({
     minPassPercentage: z.coerce.number().min(0).max(100),
@@ -34,7 +59,7 @@ const approvalSchema = z.object({
 const GateChecklistItem = ({ label, isMet, isLoading }: { label: string; isMet: boolean | null; isLoading: boolean }) => (
     <div className="flex items-center justify-between py-2">
       <span className="text-sm">{label}</span>
-      {isLoading ? <Skeleton className="h-5 w-5 rounded-full" /> : 
+      {isLoading ? <div className="h-5 w-5 rounded-full bg-muted animate-pulse" /> : 
         isMet === null ? <HelpCircle className="h-5 w-5 text-gray-400" title="Metrics not available" /> :
         isMet ? <Check className="h-5 w-5 text-green-500" /> : <X className="h-5 w-5 text-destructive" />
       }
@@ -44,98 +69,83 @@ const GateChecklistItem = ({ label, isMet, isLoading }: { label: string; isMet: 
 export default function QualityGateDetailsPage() {
     const router = useRouter();
     const params = useParams() as { projectId: string };
-    const { user } = useUser();
-    const firestore = useFirestore();
     const { toast } = useToast();
+    
+    // --- State Management with Dummy Data ---
     const [isSaving, setIsSaving] = useState(false);
     const [isApproving, setIsApproving] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [approvalAction, setApprovalAction] = useState<'approve' | 'block' | null>(null);
 
-    const projectRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}`) : null, [user, firestore, params.projectId]);
-    const gateConfigRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}/qualityGateConfig/${params.projectId}`) : null, [user, firestore, params.projectId]);
-    const approvalRef = useMemoFirebase(() => user && firestore ? doc(firestore, `users/${user.uid}/projects/${params.projectId}/deploymentApproval/${params.projectId}`) : null, [user, firestore, params.projectId]);
-    
-    const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
-    const { data: gateConfig, isLoading: isConfigLoading } = useDoc<QualityGateConfig>(gateConfigRef);
-    const { data: approval, isLoading: isApprovalLoading } = useDoc<DeploymentApproval>(approvalRef);
+    // Use state to hold our dummy data so it can be updated
+    const [project] = useState(dummyProject);
+    const [gateConfig, setGateConfig] = useState(dummyGateConfig);
+    const [approval, setApproval] = useState(dummyApproval);
+    const [metrics] = useState(dummyMetrics);
 
     const form = useForm<z.infer<typeof qualityGateSchema>>({
         resolver: zodResolver(qualityGateSchema),
-        defaultValues: { minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 },
+        defaultValues: gateConfig,
     });
+     useEffect(() => {
+        form.reset(gateConfig);
+    }, [gateConfig, form]);
 
     const approvalForm = useForm<z.infer<typeof approvalSchema>>({
         resolver: zodResolver(approvalSchema),
         defaultValues: { comment: '' }
     });
 
-    useEffect(() => {
-        if (gateConfig) {
-            form.reset(gateConfig);
-        } else {
-             form.reset({ minPassPercentage: 90, maxCriticalBugs: 0, maxHighBugs: 5, maxMediumBugs: 20 });
+    // --- Gate Logic using Dummy Data ---
+    const gateChecklist = useMemo(() => {
+        if (!gateConfig || !metrics) return null;
+        return {
+            passRateMet: metrics.passPercentage >= gateConfig.minPassPercentage,
+            criticalBugsMet: metrics.openBugs.critical <= gateConfig.maxCriticalBugs,
+            highBugsMet: metrics.openBugs.high <= gateConfig.maxHighBugs,
+            mediumBugsMet: metrics.openBugs.medium <= gateConfig.maxMediumBugs,
         }
-    }, [gateConfig, form]);
-
+    }, [gateConfig, metrics]);
+    
+    const allGatesPassed = useMemo(() => {
+        if (!gateChecklist) return false;
+        return Object.values(gateChecklist).every(isMet => isMet === true);
+    }, [gateChecklist]);
 
     async function onSaveGate(values: z.infer<typeof qualityGateSchema>) {
-        if (!gateConfigRef) return;
         setIsSaving(true);
-        const data = { ...values, projectId: params.projectId, id: params.projectId };
-        await setDocumentNonBlocking(gateConfigRef, data, { merge: true });
+        // Simulate saving
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setGateConfig(values); // Update state with new values
         toast({ title: 'Quality Gate Saved', description: 'Your configuration has been updated.' });
         setIsSaving(false);
     }
     
     async function onApproveOrBlock(values: z.infer<typeof approvalSchema>) {
-        if (!approvalRef || !user) return;
         setIsApproving(true);
-
         const newStatus = approvalAction === 'approve' ? 'Approved for Deployment' : 'Blocked';
-        const historyEntry: DeploymentApprovalHistory = {
+        
+        // Simulate saving
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const newHistoryEntry = {
             status: newStatus,
-            changedBy: user.email || user.uid,
-            changedAt: serverTimestamp() as any,
+            changedBy: 'qa.lead@test.ai',
+            changedAt: new Date(),
             comment: values.comment || '',
         };
 
-        const currentHistory = approval?.history ?? [];
-        const newHistory = [...currentHistory, historyEntry];
-
-        const data = {
-            id: params.projectId,
-            projectId: params.projectId,
+        setApproval({
+            ...approval,
             status: newStatus,
-            approvedBy: approvalAction === 'approve' ? (user.email || user.uid) : undefined,
-            approvedAt: approvalAction === 'approve' ? serverTimestamp() : undefined,
-            comments: values.comment,
-            history: newHistory,
-        };
-        
-        await setDocumentNonBlocking(approvalRef, data, { merge: true });
+            history: [...approval.history, newHistoryEntry]
+        });
         
         toast({ title: `Project ${newStatus}`, description: `The project has been marked as ${newStatus}.` });
         setIsApproving(false);
         setIsDialogOpen(false);
         approvalForm.reset();
     }
-
-    const isLoading = isProjectLoading || isConfigLoading || isApprovalLoading;
-
-    if (isLoading) return (
-        <div className="space-y-6">
-            <Skeleton className="h-8 w-1/4 mb-4" />
-            <Skeleton className="h-10 w-48" />
-            <div className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-2"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
-                <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-1/2"/></CardHeader><CardContent><Skeleton className="h-48 w-full"/></CardContent></Card>
-            </div>
-        </div>
-    );
-
-    // For now, we assume gates cannot be met until live data is re-integrated
-    const allGatesPassed = false; 
 
     return (
         <div className="space-y-6">
@@ -185,10 +195,10 @@ export default function QualityGateDetailsPage() {
                             <Form {...form}>
                                 <form onSubmit={form.handleSubmit(onSaveGate)} className="space-y-4">
                                     <div className="grid sm:grid-cols-2 gap-4">
-                                        <FormField control={form.control} name="minPassPercentage" render={({ field }) => ( <FormItem><FormLabel>Min. Pass %</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                                        <FormField control={form.control} name="maxCriticalBugs" render={({ field }) => ( <FormItem><FormLabel>Max Critical Bugs</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                                        <FormField control={form.control} name="maxHighBugs" render={({ field }) => ( <FormItem><FormLabel>Max High Bugs</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                                        <FormField control={form.control} name="maxMediumBugs" render={({ field }) => ( <FormItem><FormLabel>Max Medium Bugs</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                        <FormField control={form.control} name="minPassPercentage" render={({ field }) => ( <FormItem><FormLabel>Min. Pass % ({metrics.passPercentage}%)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                        <FormField control={form.control} name="maxCriticalBugs" render={({ field }) => ( <FormItem><FormLabel>Max Critical Bugs ({metrics.openBugs.critical})</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                        <FormField control={form.control} name="maxHighBugs" render={({ field }) => ( <FormItem><FormLabel>Max High Bugs ({metrics.openBugs.high})</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                                        <FormField control={form.control} name="maxMediumBugs" render={({ field }) => ( <FormItem><FormLabel>Max Medium Bugs ({metrics.openBugs.medium})</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                                     </div>
                                     <Button type="submit" disabled={isSaving}>{isSaving ? 'Saving...' : 'Save Configuration'}</Button>
                                 </form>
@@ -205,7 +215,7 @@ export default function QualityGateDetailsPage() {
                                             <div className={`mt-1.5 h-2.5 w-2.5 rounded-full ${entry.status === 'Approved for Deployment' ? 'bg-green-500' : 'bg-destructive'}`} />
                                             <div>
                                                 <p className="font-semibold">{entry.status} by {entry.changedBy}</p>
-                                                <p className="text-sm text-muted-foreground">{(entry.changedAt as any)?.toDate().toLocaleString()}</p>
+                                                <p className="text-sm text-muted-foreground">{entry.changedAt.toLocaleString()}</p>
                                                 {entry.comment && <p className="text-sm mt-1 p-2 bg-muted rounded-md">{entry.comment}</p>}
                                             </div>
                                         </li>
@@ -224,18 +234,20 @@ export default function QualityGateDetailsPage() {
                             <CardTitle>Deployment Approval</CardTitle>
                             <div className="flex items-center gap-2">
                                 <span className="font-semibold">Status:</span>
-                                {isApprovalLoading ? <Skeleton className="h-6 w-24" /> :
                                 <Badge variant={approval?.status === 'Approved for Deployment' ? 'secondary' : approval?.status === 'Blocked' ? 'destructive' : 'outline'}>
                                     {approval?.status ?? 'Not Ready'}
                                 </Badge>
-                                }
                             </div>
                         </CardHeader>
                         <CardContent className="divide-y">
-                            <GateChecklistItem label={`Test Pass Rate >= ${form.watch('minPassPercentage')}%`} isMet={null} isLoading={false} />
-                            <GateChecklistItem label={`Critical Bugs <= ${form.watch('maxCriticalBugs')}`} isMet={null} isLoading={false} />
-                            <GateChecklistItem label={`High Bugs <= ${form.watch('maxHighBugs')}`} isMet={null} isLoading={false} />
-                            <GateChecklistItem label={`Medium Bugs <= ${form.watch('maxMediumBugs')}`} isMet={null} isLoading={false} />
+                            {gateChecklist && (
+                                <>
+                                <GateChecklistItem label={`Test Pass Rate >= ${gateConfig.minPassPercentage}%`} isMet={gateChecklist.passRateMet} isLoading={false} />
+                                <GateChecklistItem label={`Critical Bugs <= ${gateConfig.maxCriticalBugs}`} isMet={gateChecklist.criticalBugsMet} isLoading={false} />
+                                <GateChecklistItem label={`High Bugs <= ${gateConfig.maxHighBugs}`} isMet={gateChecklist.highBugsMet} isLoading={false} />
+                                <GateChecklistItem label={`Medium Bugs <= ${gateConfig.maxMediumBugs}`} isMet={gateChecklist.mediumBugsMet} isLoading={false} />
+                                </>
+                            )}
                         </CardContent>
                         <CardFooter className="flex-col gap-2 pt-4">
                             <Button className="w-full" disabled={!allGatesPassed || isApproving} onClick={() => { setApprovalAction('approve'); setIsDialogOpen(true); }}>
