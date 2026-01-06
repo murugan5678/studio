@@ -30,6 +30,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Trash2, Info } from 'lucide-react';
+import { useRef } from 'react';
 
 const executionFormSchema = z.object({
   title: z.string().min(2, 'Title is required.'),
@@ -58,6 +59,7 @@ export default function NewExecutionPage() {
   const { user } = useUser();
   const [step, setStep] = useState(1);
   const [selectedTestCases, setSelectedTestCases] = useState<TestCase[]>([]);
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const testCasesQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -300,7 +302,7 @@ export default function NewExecutionPage() {
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Textarea placeholder="Add comments..." {...field} className="h-24"/>
+                                                        <Textarea placeholder="Add comments..." {...field} value={field.value || ''} className="h-24"/>
                                                     </FormControl>
                                                 </FormItem>
                                             )}
@@ -314,7 +316,7 @@ export default function NewExecutionPage() {
                                             render={({ field }) => (
                                                 <FormItem className='flex-1'>
                                                     <FormControl>
-                                                        <Input placeholder="Paste URL (comma-separated for multiple)" {...field} />
+                                                        <Input placeholder="Paste URL (comma-separated for multiple)" {...field} value={field.value || ''} />
                                                     </FormControl>
                                                 </FormItem>
                                             )}
@@ -327,16 +329,16 @@ export default function NewExecutionPage() {
                                           <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceFiles`}
-                                            render={({ field: { onChange, ...fieldProps} }) => (
+                                            render={({ field: { onChange } }) => (
                                                 <FormItem className='flex-1'>
                                                     <div className='flex items-center gap-1'>
                                                     <FormControl>
-                                                        <Input 
-                                                            {...fieldProps}
+                                                        <Input
                                                             type="file" 
                                                             multiple
                                                             accept="image/*,video/*"
                                                             onChange={(e) => handleFileChange(e, index)}
+                                                            ref={el => fileInputRefs.current[index] = el}
                                                         />
                                                     </FormControl>
                                                     <Tooltip>
@@ -353,8 +355,11 @@ export default function NewExecutionPage() {
                                           />
                                           <Button size="icon" variant="ghost" type="button" onClick={() => {
                                               const currentExecution = resultsForm.getValues(`executions.${index}`);
-                                              URL.revokeObjectURL(currentExecution.filePreviews?.[0] || '');
+                                              currentExecution.filePreviews?.forEach(URL.revokeObjectURL);
                                               update(index, { ...currentExecution, evidenceFiles: undefined, filePreviews: [] });
+                                              if (fileInputRefs.current[index]) {
+                                                fileInputRefs.current[index]!.value = '';
+                                              }
                                           }}>
                                               <Trash2 className="h-4 w-4" />
                                           </Button>
