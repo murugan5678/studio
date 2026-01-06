@@ -105,6 +105,7 @@ export default function NewTestCasePage() {
         createdBy: user.uid,
         createdAt: serverTimestamp(),
         tags: values.tags?.split(',').map(tag => tag.trim()).filter(Boolean) || [],
+        status: 'Approved',
       };
     
       await setDocumentNonBlocking(docRef, testCaseData, {});
@@ -364,3 +365,5 @@ export default function NewTestCasePage() {
     </Card>
   );
 }
+
+    

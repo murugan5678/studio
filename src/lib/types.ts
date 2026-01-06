@@ -30,6 +30,7 @@ export interface TestCase {
     createdBy: string;
     createdAt: Timestamp;
     updatedAt?: Timestamp;
+    status: 'Pending' | 'Approved';
   }
   
 export interface TestExecutionRun {
@@ -48,3 +49,5 @@ export interface TestExecutionResult {
     evidenceLinks?: string[];
     evidenceFiles?: string[];
 }
+
+    

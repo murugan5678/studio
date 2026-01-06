@@ -157,6 +157,14 @@
           "type": "string",
           "description": "The date this test case was created.",
           "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The approval status of the test case.",
+          "enum": [
+            "Pending",
+            "Approved"
+          ]
         }
       },
       "required": [
@@ -169,7 +177,8 @@
         "preconditions",
         "testSteps",
         "expectedResult",
-        "automationFeasibility"
+        "automationFeasibility",
+        "status"
       ]
     },
     "TestExecution": {
@@ -426,3 +435,4 @@
     "reasoning": "The Firestore structure is designed to prioritize authorization independence, clarity, and scalability. It leverages path-based ownership for user-related data and employs denormalization to avoid `get()` calls in security rules, thus ensuring atomic operations and simplifying debugging. The structure supports secure `list` operations through structural segregation, maintaining a homogeneous security posture within each collection.\n\nSpecifically, the `/users/{userId}` collection stores user profiles. Projects are stored in `/users/{userId}/projects/{projectId}`, establishing clear ownership and eliminating the need to check user roles during project access. Test cases, test executions, and automation scripts follow a similar pattern, residing under their respective projects (`/users/{userId}/projects/{projectId}/testCases/{testCaseId}`, `/users/{userId}/projects/{projectId}/testExecutions/{testExecutionId}`, and `/users/{userId}/projects/{projectId}/automationScripts/{automationScriptId}`), thereby ensuring that access to these resources is implicitly controlled by project ownership. Tags are stored globally under `/tags/{tagId}` since they are not user-specific and are intended to be shared across the application.\n\nThis design ensures Authorization Independence by nesting project-related data under the user's path, inherently linking project ownership to the user's ID.  QAPs are supported through segregation: the path structure itself enforces that only the owner can list projects they own, test cases they own, etc. There are no `get()` calls to a parent document needed to determine access; the path dictates authorization. Global tags don't require user-specific authorization, so are stored in a separate collection.\n\nThis structure avoids complex security rules and ensures data integrity by enforcing clear ownership and consistent access patterns."
   }
 }
+    

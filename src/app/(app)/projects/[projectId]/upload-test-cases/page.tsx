@@ -106,6 +106,7 @@ export default function UploadTestCasesPage() {
           priority: ['Low', 'Medium', 'High', 'Critical'].includes(row.priority) ? row.priority : 'Medium',
           automationFeasibility: ['Manual', 'Automatable'].includes(row.automationFeasibility) ? row.automationFeasibility : 'Manual',
           type: ['Positive', 'Negative', 'Edge'].includes(row.type) ? row.type : 'Positive',
+          status: 'Approved',
         };
         return setDocumentNonBlocking(docRef, testCaseData, {});
       });
@@ -221,3 +222,5 @@ export default function UploadTestCasesPage() {
     </div>
   );
 }
+
+    

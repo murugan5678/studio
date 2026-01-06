@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { useDoc, useFirestore, useUser, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where } from 'firebase/firestore';
 import type { Project, TestCase, TestExecutionRun } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2 } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -70,7 +70,12 @@ export default function ProjectDetailsPage() {
 
   const testCasesQuery = useMemoFirebase(() => {
     if(!user || !firestore) return null;
-    return collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`);
+    return query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`), where('status', '==', 'Approved'));
+  }, [user, firestore, params.projectId]);
+
+  const pendingTestCasesQuery = useMemoFirebase(() => {
+    if(!user || !firestore) return null;
+    return query(collection(firestore, `users/${user.uid}/projects/${params.projectId}/testCases`), where('status', '==', 'Pending'));
   }, [user, firestore, params.projectId]);
 
   const executionsQuery = useMemoFirebase(() => {
@@ -80,6 +85,7 @@ export default function ProjectDetailsPage() {
 
   const { data: project, isLoading: isProjectLoading } = useDoc<Project>(projectRef);
   const { data: testCases, isLoading: areTestCasesLoading } = useCollection<TestCase>(testCasesQuery);
+  const { data: pendingTestCases, isLoading: arePendingTestCasesLoading } = useCollection<TestCase>(pendingTestCasesQuery);
   const { data: executionRuns, isLoading: areExecutionsLoading } = useCollection<TestExecutionRun>(executionsQuery);
 
   const handleDownloadTemplate = () => {
@@ -186,7 +192,7 @@ export default function ProjectDetailsPage() {
   }, [executionRuns]);
 
 
-  if (isProjectLoading || areTestCasesLoading || areExecutionsLoading) {
+  if (isProjectLoading || areTestCasesLoading || areExecutionsLoading || arePendingTestCasesLoading) {
     return (
         <div className="space-y-6">
             <Skeleton className="h-10 w-1/3" />
@@ -211,6 +217,7 @@ export default function ProjectDetailsPage() {
   const allTestCaseIds = testCases?.map(tc => tc.id) || [];
   const isAllSelected = selectedTestCases.length > 0 && selectedTestCases.length === allTestCaseIds.length;
   const isSomeSelected = selectedTestCases.length > 0 && !isAllSelected;
+  const pendingCount = pendingTestCases?.length || 0;
 
   return (
     <div className="space-y-6">
@@ -289,6 +296,13 @@ export default function ProjectDetailsPage() {
                       </AlertDialogContent>
                   </AlertDialog>
                 )}
+                 {pendingCount > 0 && (
+                    <Button asChild variant="secondary">
+                        <Link href={`/projects/${params.projectId}/review`}>
+                            <ShieldCheck className="mr-2 h-4 w-4" /> Review ({pendingCount})
+                        </Link>
+                    </Button>
+                 )}
                 <Button asChild variant="outline">
                     <Link href={`/projects/${params.projectId}/upload-test-cases`}>
                         <Upload className="mr-2 h-4 w-4" /> Upload Cases
@@ -308,7 +322,7 @@ export default function ProjectDetailsPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Test Cases</CardTitle>
-                    <CardDescription>All test cases for the {project.name} project.</CardDescription>
+                    <CardDescription>All approved test cases for the {project.name} project.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -463,3 +477,5 @@ export default function ProjectDetailsPage() {
     </div>
   );
 }
+
+    

@@ -32,6 +32,7 @@ const TestCaseSchema = z.object({
   automationFeasibility: z.enum(['Manual', 'Automatable']).describe('Whether the test case is a good candidate for automation.'),
   automationPriority: z.string().describe('The priority for automating this test case (e.g., "P0", "P1", "P2").'),
   tags: z.array(z.string()).describe('Relevant tags or labels for grouping and filtering (e.g., "smoke", "regression", "login").'),
+  status: z.enum(['Pending', 'Approved']).default('Pending').describe('The approval status of the test case. Always set to "Pending" for initial generation.'),
 });
 
 const GenerateTestScenariosOutputSchema = z.object({
@@ -44,7 +45,8 @@ export async function generateTestScenarios(input: GenerateTestScenariosInput): 
   // Post-process to add unique IDs if the model didn't, using a simple counter.
   const processedCases = result.testCases.map((tc, index) => ({
     ...tc,
-    testCaseId: tc.testCaseId || `TC${String(index + 1).padStart(3, '0')}`,
+    testCaseId: `TC${String(index + 1).padStart(3, '0')}`,
+    status: 'Pending' as const, // Ensure status is always Pending
   }));
   return { testCases: processedCases };
 }
@@ -57,7 +59,8 @@ const prompt = ai.definePrompt({
 
 Analyze the provided input, which could be a screenshot, a design link, a document, or a simple text description of a feature. From this, generate a diverse set of test cases covering positive paths, negative paths, and edge cases.
 
-For each test case, meticulously fill out all fields in the required structure. Pay close attention to creating meaningful titles, clear preconditions, and granular, easy-to-follow test steps. Ensure the testCaseId is a sequential identifier like "TC001", "TC002", etc.
+For each test case, meticulously fill out all fields in the required structure. Ensure the testCaseId is a sequential identifier like "TC001", "TC002", etc.
+Crucially, set the 'status' field for every generated test case to 'Pending'.
 
 Analyze the following input and generate the test cases:
 
@@ -76,3 +79,5 @@ const generateTestScenariosFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    
