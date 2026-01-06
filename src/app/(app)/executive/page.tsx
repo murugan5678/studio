@@ -56,38 +56,54 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading || !projects || !user || !firestore) {
-            setIsLoading(false);
+        // Only proceed if projects have been loaded and are not undefined
+        if (areProjectsLoading || projects === undefined || !user || !firestore) {
+            // Keep loading if projects are loading, or stop if there's no user/db
+             if (!areProjectsLoading) {
+                setIsLoading(false);
+            }
             return;
         }
 
         const fetchData = async () => {
             setIsLoading(true);
             const projectsToFetch = selectedProjectId === 'all' 
-                ? projects 
-                : projects.filter(p => p.id === selectedProjectId);
+                ? projects || []
+                : (projects || []).filter(p => p.id === selectedProjectId);
+
+            if (projectsToFetch.length === 0) {
+                setAggregatedData({ testCases: [], executions: [], defects: [] });
+                setIsLoading(false);
+                return;
+            }
 
             const allTestCases: TestCase[] = [];
             const allExecutions: TestExecutionRun[] = [];
             const allDefects: Defect[] = [];
 
-            for (const project of projectsToFetch) {
-                const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
-                const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
-                const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
-
-                const [tcSnap, execSnap, defectSnap] = await Promise.all([
-                    getDocs(tcQuery),
-                    getDocs(execQuery),
-                    getDocs(defectSnap),
-                ]);
-
-                allTestCases.push(...tcSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
-                allExecutions.push(...execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun)));
-                allDefects.push(...defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect)));
+            try {
+                for (const project of projectsToFetch) {
+                    const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
+                    const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
+                    const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
+    
+                    const [tcSnap, execSnap, defectSnap] = await Promise.all([
+                        getDocs(tcQuery),
+                        getDocs(execQuery),
+                        getDocs(defectQuery),
+                    ]);
+    
+                    allTestCases.push(...tcSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
+                    allExecutions.push(...execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun)));
+                    allDefects.push(...defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect)));
+                }
+                setAggregatedData({ testCases: allTestCases, executions: allExecutions, defects: allDefects });
+            } catch (error) {
+                console.error("Failed to fetch executive data:", error);
+                setAggregatedData({ testCases: [], executions: [], defects: [] });
+            } finally {
+                setIsLoading(false);
             }
-            setAggregatedData({ testCases: allTestCases, executions: allExecutions, defects: allDefects });
-            setIsLoading(false);
         }
         fetchData();
     }, [projects, user, firestore, areProjectsLoading, selectedProjectId]);
