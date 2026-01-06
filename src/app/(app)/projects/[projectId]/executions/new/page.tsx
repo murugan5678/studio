@@ -42,6 +42,7 @@ const executionResultsSchema = z.object({
       status: z.enum(['Passed', 'Failed', 'Blocked', 'Deferred', "Can't Test"]),
       comments: z.string().optional(),
       evidenceLinks: z.string().optional(),
+      evidenceFiles: z.custom<FileList>().optional(),
     })
   ),
 });
@@ -106,10 +107,16 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
       projectId: params.projectId,
       userId: user.uid,
       createdAt: serverTimestamp(),
-      results: values.executions.map(ex => ({
-        ...ex,
-        evidenceLinks: ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : []
-      })),
+      results: values.executions.map(ex => {
+        const links = ex.evidenceLinks ? ex.evidenceLinks.split(',').map(link => link.trim()).filter(Boolean) : [];
+        const fileNames = ex.evidenceFiles ? Array.from(ex.evidenceFiles).map(file => file.name) : [];
+        return {
+          testCaseId: ex.testCaseId,
+          status: ex.status,
+          comments: ex.comments,
+          evidenceLinks: [...links, ...fileNames],
+        }
+      }),
     };
     
     const testExecutionsCollection = collection(firestore, `users/${user.uid}/projects/${params.projectId}/testExecutions`);
@@ -219,10 +226,10 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className='w-[30%]'>Test Case</TableHead>
+                                <TableHead className='w-[25%]'>Test Case</TableHead>
                                 <TableHead className='w-[15%]'>Status</TableHead>
-                                <TableHead className='w-[25%]'>Comments</TableHead>
-                                <TableHead className='w-[30%]'>Evidence Links</TableHead>
+                                <TableHead className='w-[20%]'>Comments</TableHead>
+                                <TableHead className='w-[40%]'>Evidence</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -266,16 +273,31 @@ export default function NewExecutionPage({ params }: { params: { projectId: stri
                                             )}
                                         />
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className='space-y-2'>
                                          <FormField
                                             control={resultsForm.control}
                                             name={`executions.${index}.evidenceLinks`}
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormControl>
-                                                        <Input placeholder="https://..." {...field} />
+                                                        <Input placeholder="Paste URL (comma-separated)" {...field} />
                                                     </FormControl>
-                                                    <FormDescription className="text-xs">Comma-separated links.</FormDescription>
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={resultsForm.control}
+                                            name={`executions.${index}.evidenceFiles`}
+                                            render={({ field: { onChange, ...fieldProps} }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input 
+                                                            {...fieldProps}
+                                                            type="file" 
+                                                            multiple
+                                                            onChange={(e) => onChange(e.target.files)}
+                                                        />
+                                                    </FormControl>
                                                 </FormItem>
                                             )}
                                         />
