@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Paperclip } from 'lucide-react';
+import { ArrowLeft, Paperclip, Link2 } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -135,6 +135,7 @@ export default function ExecutionDetailsPage() {
                                 <TableHead>Status</TableHead>
                                 <TableHead>Comments</TableHead>
                                 <TableHead>Evidence</TableHead>
+                                <TableHead>Bug Ticket</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -170,6 +171,14 @@ export default function ExecutionDetailsPage() {
                                                     <span className="text-sm text-muted-foreground">No evidence provided.</span>
                                                 )}
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {result.bugLink ? (
+                                                <a href={result.bugLink} target="_blank" rel="noopener noreferrer" className="flex items-center text-primary hover:underline">
+                                                    <Link2 className="mr-2 h-4 w-4" />
+                                                    View Ticket
+                                                </a>
+                                            ) : 'N/A'}
                                         </TableCell>
                                     </TableRow>
                                 );
