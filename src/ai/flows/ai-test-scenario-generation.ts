@@ -35,7 +35,7 @@ const TestCaseSchema = z.object({
   tags: z.array(z.string()).describe('Relevant tags or labels for grouping and filtering (e.g., "smoke", "regression", "login").'),
 });
 
-export const GenerateTestScenariosOutputSchema = z.object({
+const GenerateTestScenariosOutputSchema = z.object({
   testCases: z.array(TestCaseSchema).describe('The array of generated test cases.'),
 });
 export type GenerateTestScenariosOutput = z.infer<typeof GenerateTestScenariosOutputSchema>;
