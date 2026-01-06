@@ -74,6 +74,7 @@ export default function ProjectDetailsPage() {
   const router = useRouter();
   const params = useParams() as { projectId: string };
   const [selectedTestCases, setSelectedTestCases] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("test-cases");
 
   const projectRef = useMemoFirebase(() => {
     if (!user || !firestore) return null;
@@ -119,7 +120,7 @@ const projectStats = useMemo(() => {
     (executionRuns || []).forEach(run => {
         run.results.forEach(result => {
             const existing = latestResults.get(result.testCaseId);
-            if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
+            if (!existing || (run.createdAt?.toMillis() > existing.executionDate?.toMillis())) {
                 latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
             }
         });
@@ -313,55 +314,66 @@ const projectStats = useMemo(() => {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="test-cases">
+      <Tabs defaultValue="test-cases" value={activeTab} onValueChange={setActiveTab}>
         <div className="flex justify-between items-center">
             <TabsList>
                 <TabsTrigger value="test-cases">Test Cases</TabsTrigger>
                 <TabsTrigger value="executions">Test Execution</TabsTrigger>
             </TabsList>
             <div className='flex items-center gap-2'>
-                {selectedTestCases.length > 0 && (
-                  <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="sm">
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete ({selectedTestCases.length})
-                          </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                          <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                  This action cannot be undone. This will permanently delete the selected {selectedTestCases.length} test case(s).
-                              </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={handleDeleteSelected}>Continue</AlertDialogAction>
-                          </AlertDialogFooter>
-                      </AlertDialogContent>
-                  </AlertDialog>
+              {activeTab === 'test-cases' && (
+                <>
+                  {selectedTestCases.length > 0 && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete ({selectedTestCases.length})
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the selected {selectedTestCases.length} test case(s).
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteSelected}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                  {pendingCount > 0 && (
+                      <Button asChild variant="secondary">
+                          <Link href={`/projects/${params.projectId}/review`}>
+                              <ShieldCheck className="mr-2 h-4 w-4" /> Review ({pendingCount})
+                          </Link>
+                      </Button>
+                  )}
+                  <Button asChild variant="outline">
+                      <Link href={`/projects/${params.projectId}/upload-test-cases`}>
+                          <Upload className="mr-2 h-4 w-4" /> Upload Cases
+                      </Link>
+                  </Button>
+                  <Button variant="outline" onClick={handleDownloadTemplate}>
+                      <Download className="mr-2 h-4 w-4" /> Download Template
+                  </Button>
+                  <Button asChild>
+                      <Link href={`/projects/${params.projectId}/new-test-case`}>
+                          <PlusCircle className="mr-2 h-4 w-4" /> New Test Case
+                      </Link>
+                  </Button>
+                </>
+              )}
+               {activeTab === 'executions' && (
+                  <Button asChild>
+                      <Link href={`/projects/${params.projectId}/executions/new`}>
+                          <PlayCircle className="mr-2 h-4 w-4" /> New Execution Run
+                      </Link>
+                  </Button>
                 )}
-                 {pendingCount > 0 && (
-                    <Button asChild variant="secondary">
-                        <Link href={`/projects/${params.projectId}/review`}>
-                            <ShieldCheck className="mr-2 h-4 w-4" /> Review ({pendingCount})
-                        </Link>
-                    </Button>
-                 )}
-                <Button asChild variant="outline">
-                    <Link href={`/projects/${params.projectId}/upload-test-cases`}>
-                        <Upload className="mr-2 h-4 w-4" /> Upload Cases
-                    </Link>
-                </Button>
-                 <Button variant="outline" onClick={handleDownloadTemplate}>
-                    <Download className="mr-2 h-4 w-4" /> Download Template
-                </Button>
-                <Button asChild>
-                    <Link href={`/projects/${params.projectId}/new-test-case`}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> New Test Case
-                    </Link>
-                </Button>
             </div>
         </div>
         <TabsContent value="test-cases">
@@ -465,75 +477,19 @@ const projectStats = useMemo(() => {
             </Card>
         </TabsContent>
         <TabsContent value="executions">
-        <Card>
-                <CardHeader className='flex-row items-center justify-between'>
-                    <div>
-                        <CardTitle>Test Executions</CardTitle>
-                        <CardDescription>Execution history for this project.</CardDescription>
-                    </div>
-                     <Button asChild>
-                        <Link href={`/projects/${params.projectId}/executions/new`}>
-                            <PlayCircle className="mr-2 h-4 w-4" /> New Execution Run
-                        </Link>
-                    </Button>
-                </CardHeader>
-                <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Run Title</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Results</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Bugs</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {areExecutionsLoading && (
-                            <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
-                                    Loading execution runs...
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {!areExecutionsLoading && executionRuns && executionRuns.length > 0 ? (
-                            executionRuns.map(run => {
-                                const stats = getRunStats(run);
-                                return (
-                                    <TableRow key={run.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/projects/${params.projectId}/executions/${run.id}`)}>
-                                        <TableCell className="font-medium">{run.title}</TableCell>
-                                        <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
-                                        <TableCell>
-                                            {stats.passed} Passed, {stats.failed} Failed ({stats.total} total)
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant={stats.failed > 0 ? 'destructive' : 'secondary'}>
-                                                {stats.failed > 0 ? 'Failed' : 'Passed'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {stats.hasBugs && (
-                                                <Link href={`/projects/${params.projectId}/executions/${run.id}`} className="flex items-center text-primary hover:underline">
-                                                    <Bug className="h-4 w-4" />
-                                                </Link>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                )
-                            })
-                        ) : (
-                            !areExecutionsLoading && (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        No execution runs yet.
-                                    </TableCell>
-                                </TableRow>
-                            )
-                        )}
-                    </TableBody>
-                </Table>
-                </CardContent>
-            </Card>
+          <Card>
+              <CardHeader>
+                  <CardTitle>Executions</CardTitle>
+                  <CardDescription>
+                      This feature is not implemented yet. Redirecting to the list of all executions.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <Button onClick={() => router.push(`/projects/${params.projectId}/executions`)}>
+                      View Project Executions
+                  </Button>
+              </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
