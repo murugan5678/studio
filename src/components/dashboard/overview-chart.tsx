@@ -9,10 +9,10 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart';
 import { PieChart, Pie, Cell } from 'recharts';
-import { useFirestore, useUser } from '@/firebase';
+import { useCollection, useFirestore, useUser, useMemoFirebase } from '@/firebase';
 import type { Project, TestExecutionRun } from '@/lib/types';
-import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { useMemo } from 'react';
+import { collectionGroup, query } from 'firebase/firestore';
 
 interface OverviewChartProps {
     projects: Project[];
@@ -44,62 +44,47 @@ const chartConfig = {
     },
 };
 
-type StatusCounts = {
-    [key: string]: number;
-}
-
 export function OverviewChart({ projects }: OverviewChartProps) {
   const { user } = useUser();
   const firestore = useFirestore();
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [totalExecutions, setTotalExecutions] = useState(0);
 
-  useEffect(() => {
-    if (!user || !firestore || projects.length === 0) {
-        setChartData([]);
-        setTotalExecutions(0);
-        return;
+  const allExecutionsQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(collectionGroup(firestore, 'testExecutions'));
+  }, [user, firestore]);
+
+  const { data: allExecutions } = useCollection<TestExecutionRun>(allExecutionsQuery);
+  
+  const userExecutions = useMemo(() => {
+    if (!allExecutions || !user) return [];
+    return allExecutions.filter(ex => ex.userId === user.uid);
+  }, [allExecutions, user]);
+
+  const { chartData, totalExecutions } = useMemo(() => {
+    const statusCounts: { [key: string]: number } = {
+        'Passed': 0, 'Failed': 0, 'Blocked': 0, 'Deferred': 0, "Can't Test": 0,
     };
+    let total = 0;
 
-    const fetchExecutionData = async () => {
-        const statusCounts: StatusCounts = {
-            'Passed': 0,
-            'Failed': 0,
-            'Blocked': 0,
-            'Deferred': 0,
-            "Can't Test": 0,
-        };
-        let total = 0;
-
-        const execPromises = projects.map(p => getDocs(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`)));
-        const execSnapshots = await Promise.all(execPromises);
-
-        execSnapshots.forEach(snap => {
-            snap.forEach(doc => {
-                const run = doc.data() as TestExecutionRun;
-                run.results.forEach(result => {
-                    total++;
-                    if (statusCounts.hasOwnProperty(result.status)) {
-                        statusCounts[result.status]++;
-                    }
-                });
-            });
+    userExecutions.forEach(run => {
+        run.results.forEach(result => {
+            total++;
+            if (statusCounts.hasOwnProperty(result.status)) {
+                statusCounts[result.status]++;
+            }
         });
-        
-        const dataForChart = Object.keys(chartConfig)
-            .filter(key => key !== 'count')
-            .map(status => ({
-                status,
-                count: statusCounts[status] || 0,
-                fill: chartConfig[status as keyof typeof chartConfig].color,
-            })).filter(item => item.count > 0);
+    });
+    
+    const dataForChart = Object.keys(chartConfig)
+        .filter(key => key !== 'count')
+        .map(status => ({
+            status,
+            count: statusCounts[status] || 0,
+            fill: chartConfig[status as keyof typeof chartConfig].color,
+        })).filter(item => item.count > 0);
 
-        setChartData(dataForChart);
-        setTotalExecutions(total);
-    };
-
-    fetchExecutionData();
-  }, [projects, user, firestore]);
+    return { chartData: dataForChart, totalExecutions: total };
+  }, [userExecutions]);
 
 
   return (
