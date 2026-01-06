@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useEffect } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ const formSchema = z.object({
   testData: z.string().optional(),
   automationPriority: z.string().optional(),
   tags: z.string().optional(),
+  ticketUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
 });
 
 export default function EditTestCasePage({ params }: { params: { projectId: string; testCaseId: string } }) {
@@ -85,6 +86,7 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
         testData: '',
         automationPriority: '',
         tags: '',
+        ticketUrl: '',
       },
   });
 
@@ -93,6 +95,7 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
       form.reset({
         ...testCase,
         tags: testCase.tags?.join(', ') || '',
+        ticketUrl: testCase.ticketUrl || '',
       });
     }
   }, [testCase, form]);
@@ -371,6 +374,19 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
                         />
                         <FormField
                             control={form.control}
+                            name="ticketUrl"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Ticket URL</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g., https://jira.example.com/browse/PROJ-123" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
                             name="tags"
                             render={({ field }) => (
                                 <FormItem>
@@ -400,4 +416,5 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
   );
 }
 
+    
     

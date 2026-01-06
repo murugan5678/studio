@@ -31,6 +31,7 @@ export interface TestCase {
     createdAt: Timestamp;
     updatedAt?: Timestamp;
     status: 'Pending' | 'Approved';
+    ticketUrl?: string;
   }
   
 export interface TestExecutionRun {
@@ -50,4 +51,5 @@ export interface TestExecutionResult {
     evidenceFiles?: string[];
 }
 
+    
     

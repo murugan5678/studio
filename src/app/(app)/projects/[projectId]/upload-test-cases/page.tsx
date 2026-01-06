@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 const EXPECTED_HEADERS = [
   "title", "module", "priority", "severity", "preconditions", "testSteps", 
   "expectedResult", "automationFeasibility", "type", "subModule", "team", 
-  "sprint", "release", "testData", "automationPriority", "tags"
+  "sprint", "release", "testData", "automationPriority", "tags", "ticketUrl"
 ];
 
 export default function UploadTestCasesPage() {
@@ -65,6 +65,8 @@ export default function UploadTestCasesPage() {
   const validateHeaders = (fileHeaders: string[]) => {
     const errors: string[] = [];
     EXPECTED_HEADERS.forEach(expectedHeader => {
+      // ticketUrl is optional
+      if (expectedHeader === 'ticketUrl') return;
       if (!fileHeaders.includes(expectedHeader)) {
         errors.push(expectedHeader);
       }
@@ -223,4 +225,5 @@ export default function UploadTestCasesPage() {
   );
 }
 
+    
     

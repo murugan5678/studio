@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck } from 'lucide-react';
+import { PlusCircle, Upload, CheckCircle, XCircle, PauseCircle, HelpCircle, PlayCircle, Download, Trash2, ShieldCheck, Link2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -53,7 +53,7 @@ const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' 
   Critical: 'destructive',
 };
 
-const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags";
+const TEST_CASE_CSV_HEADERS = "title,module,priority,severity,preconditions,testSteps,expectedResult,automationFeasibility,type,subModule,team,sprint,release,testData,automationPriority,tags,ticketUrl";
 
 export default function ProjectDetailsPage() {
   const { user } = useUser();
@@ -339,7 +339,7 @@ export default function ProjectDetailsPage() {
                                       }
                                     }}
                                     aria-label="Select all"
-                                    indeterminate={isSomeSelected}
+                                    indeterminate={isSomeSelected ? "indeterminate" : false}
                                   />
                                 </TableHead>
                                 <TableHead>ID</TableHead>
@@ -381,7 +381,14 @@ export default function ProjectDetailsPage() {
                                             {tc.id}
                                           </Link>
                                         </TableCell>
-                                        <TableCell className='font-medium'>{tc.title}</TableCell>
+                                        <TableCell className='font-medium flex items-center gap-2'>
+                                          {tc.title}
+                                          {tc.ticketUrl && (
+                                            <a href={tc.ticketUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                              <Link2 className="h-4 w-4" />
+                                            </a>
+                                          )}
+                                          </TableCell>
                                         <TableCell>{tc.module}</TableCell>
                                         <TableCell>
                                             <Badge variant={priorityVariant[tc.priority]}>{tc.priority}</Badge>
@@ -478,4 +485,5 @@ export default function ProjectDetailsPage() {
   );
 }
 
+    
     

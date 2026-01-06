@@ -48,6 +48,7 @@ const formSchema = z.object({
   testData: z.string().optional(),
   automationPriority: z.string().optional(),
   tags: z.string().optional(),
+  ticketUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
 });
 
 export default function NewTestCasePage() {
@@ -76,6 +77,7 @@ export default function NewTestCasePage() {
       testData: '',
       automationPriority: '',
       tags: '',
+      ticketUrl: '',
     },
   });
 
@@ -335,6 +337,19 @@ export default function NewTestCasePage() {
                                 </FormItem>
                             )}
                         />
+                         <FormField
+                            control={form.control}
+                            name="ticketUrl"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Ticket URL</FormLabel>
+                                <FormControl>
+                                    <Input placeholder="e.g., https://jira.example.com/browse/PROJ-123" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
                         <FormField
                             control={form.control}
                             name="tags"
@@ -366,4 +381,5 @@ export default function NewTestCasePage() {
   );
 }
 
+    
     

@@ -33,6 +33,7 @@ const TestCaseSchema = z.object({
   automationPriority: z.string().describe('The priority for automating this test case (e.g., "P0", "P1", "P2").'),
   tags: z.array(z.string()).describe('Relevant tags or labels for grouping and filtering (e.g., "smoke", "regression", "login").'),
   status: z.enum(['Pending', 'Approved']).default('Pending').describe('The approval status of the test case. Always set to "Pending" for initial generation.'),
+  ticketUrl: z.string().optional().describe('A URL to a ticket in a tool like Jira. If the input contains a ticket link, include it here.')
 });
 
 const GenerateTestScenariosOutputSchema = z.object({
@@ -80,4 +81,5 @@ const generateTestScenariosFlow = ai.defineFlow(
   }
 );
 
+    
     
