@@ -2,13 +2,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { AppLogo } from '@/components/icons';
-import { LayoutDashboard, Beaker, Folder, Settings, BarChart, Bot } from 'lucide-react';
+import { LayoutDashboard, Beaker, Folder, Settings, BarChart, Bot, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
     { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/projects', icon: Folder, label: 'Projects' },
     { href: '/executions', icon: Beaker, label: 'Executions' },
+    { href: '/executive', icon: Shield, label: 'Executive' },
     { href: '/ai', icon: Bot, label: 'AI Generation' },
 ]
 

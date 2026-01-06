@@ -6,6 +6,7 @@ export interface Project {
     description: string;
     createdAt: Timestamp;
     userId: string;
+    releaseId?: string;
 }
 
 export interface TestCase {
@@ -30,8 +31,11 @@ export interface TestCase {
     createdBy: string;
     createdAt: Timestamp;
     updatedAt?: Timestamp;
-    status: 'Pending' | 'Approved';
+    status: 'Pending' | 'Approved' | 'Draft' | 'In Review' | 'Locked';
     ticketUrl?: string;
+    flaky?: boolean;
+    versionHistory?: any[]; // Simplified for now
+    reviewComments?: string;
   }
   
 export interface TestExecutionRun {
@@ -41,6 +45,8 @@ export interface TestExecutionRun {
     createdAt: Timestamp;
     userId: string;
     results: TestExecutionResult[];
+    environment?: string;
+    buildVersion?: string;
 }
 
 export interface TestExecutionResult {
@@ -51,5 +57,38 @@ export interface TestExecutionResult {
     evidenceFiles?: string[];
 }
 
+export interface Defect {
+    id: string;
+    projectId: string;
+    testCaseId?: string;
+    title: string;
+    description: string;
+    severity: 'Low' | 'Medium' | 'High' | 'Critical';
+    status: 'Open' | 'In Progress' | 'Resolved' | 'Closed';
+    createdAt: Timestamp;
+    reportedBy: string;
+}
+
+export interface Release {
+    id: string;
+    name: string;
+    projectId: string;
+    startDate: Timestamp;
+    endDate: Timestamp;
+}
+
+export interface Requirement {
+    id: string;
+    projectId: string;
+    title: string;
+    description: string;
+}
+
+export interface RTMEntry {
+    requirementId: string;
+    testCaseId: string;
+    testExecutionId?: string;
+    defectId?: string;
+}
     
     
