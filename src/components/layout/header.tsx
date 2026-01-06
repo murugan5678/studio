@@ -21,7 +21,6 @@ const navItems = [
     { href: '/projects', icon: Folder, label: 'Projects' },
     { href: '/executions', icon: Beaker, label: 'Executions' },
     { href: '/ai/scenario-generator', icon: Bot, label: 'AI Generation' },
-    { href: '/analytics', icon: BarChart, label: 'Analytics' },
     { href: '/settings', icon: Settings, label: 'Settings' },
 ]
 

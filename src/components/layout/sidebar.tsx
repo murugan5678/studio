@@ -10,7 +10,6 @@ const navItems = [
     { href: '/projects', icon: Folder, label: 'Projects' },
     { href: '/executions', icon: Beaker, label: 'Executions' },
     { href: '/ai', icon: Bot, label: 'AI Generation' },
-    { href: '/analytics', icon: BarChart, label: 'Analytics' },
 ]
 
 export function Sidebar() {
