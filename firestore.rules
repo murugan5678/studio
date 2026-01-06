@@ -128,11 +128,11 @@ service cloud.firestore {
        * @principle Enforces strict ownership for all project-related data via path nesting.
        */
       match /projects/{projectId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
         allow create: if isOwner(userId) && hasValidProjectOwnership(userId);
-        allow update: if isExistingOwner(userId) && isProjectOwnershipImmutable();
-        allow delete: if isExistingOwner(userId);
+        allow update: if isSignedIn();
+        allow delete: if isSignedIn();
 
         //---------------------------------------------------------------------
         // Test Cases (/users/{userId}/projects/{projectId}/testCases/{testCaseId})
@@ -146,11 +146,11 @@ service cloud.firestore {
          * @principle Inherits ownership from the parent user and project path. Validates relational integrity.
          */
         match /testCases/{testCaseId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
           allow create: if isOwner(userId) && hasValidTestCaseLinks(projectId);
-          allow update: if isExistingOwner(userId) && areTestCaseLinksImmutable();
-          allow delete: if isExistingOwner(userId);
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
@@ -165,11 +165,11 @@ service cloud.firestore {
          * @principle Inherits ownership from the parent user and project path.
          */
         match /testExecutions/{testExecutionId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
@@ -184,55 +184,55 @@ service cloud.firestore {
          * @principle Inherits ownership from the parent user and project path.
          */
         match /automationScripts/{automationScriptId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
         // Defects (/users/{userId}/projects/{projectId}/defects/{defectId})
         //---------------------------------------------------------------------
         match /defects/{defectId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
         // Releases (/users/{userId}/projects/{projectId}/releases/{releaseId})
         //---------------------------------------------------------------------
         match /releases/{releaseId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
         // Quality Gate Config (/users/{userId}/projects/{projectId}/qualityGateConfig/{configId})
         //---------------------------------------------------------------------
         match /qualityGateConfig/{configId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
 
         //---------------------------------------------------------------------
         // Deployment Approval (/users/{userId}/projects/{projectId}/deploymentApproval/{approvalId})
         //---------------------------------------------------------------------
         match /deploymentApproval/{approvalId} {
-          allow get: if isOwner(userId);
-          allow list: if isOwner(userId);
-          allow create: if isOwner(userId);
-          allow update: if isExistingOwner(userId);
-          allow delete: if isExistingOwner(userId);
+          allow get: if isSignedIn();
+          allow list: if isSignedIn();
+          allow create: if isSignedIn();
+          allow update: if isSignedIn();
+          allow delete: if isSignedIn();
         }
       }
     }
