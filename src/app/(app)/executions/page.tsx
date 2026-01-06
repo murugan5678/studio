@@ -30,21 +30,12 @@ export default function ExecutionsPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (!user || !firestore) {
-            setIsLoading(false);
-            return;
-        }
+        if (!user || !firestore) return;
 
         const fetchAllExecutions = async () => {
             setIsLoading(true);
             const projectsRef = collection(firestore, `users/${user.uid}/projects`);
             const projectsSnap = await getDocs(projectsRef);
-
-            if (projectsSnap.empty) {
-                setAllRuns([]);
-                setIsLoading(false);
-                return;
-            }
 
             const projects = projectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Project[];
             const projectMap = new Map(projects.map(p => [p.id, p.name]));

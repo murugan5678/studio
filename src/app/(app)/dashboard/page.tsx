@@ -34,18 +34,7 @@ export default function DashboardPage() {
     const { data: recentProjects, isLoading: areRecentProjectsLoading } = useCollection<Project>(recentProjectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading) return; // Wait until projects are loaded
-        if (!projects || !user || !firestore) {
-            setIsDataLoading(false);
-            setAllProjectsData({ testCases: [], executions: [], latestResults: new Map() });
-            return;
-        };
-
-        if (projects.length === 0) {
-            setIsDataLoading(false);
-            setAllProjectsData({ testCases: [], executions: [], latestResults: new Map() });
-            return;
-        }
+        if (areProjectsLoading || !projects || !user || !firestore) return;
 
         setIsDataLoading(true);
         const fetchAllData = async () => {

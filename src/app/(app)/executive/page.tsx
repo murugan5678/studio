@@ -56,10 +56,8 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading) return;
-        if (!projects || !user || !firestore) {
+        if (areProjectsLoading || !projects || !user || !firestore) {
             setIsLoading(false);
-            setAggregatedData({ testCases: [], executions: [], defects: [] });
             return;
         }
 
@@ -68,12 +66,6 @@ export default function ExecutiveDashboardPage() {
             const projectsToFetch = selectedProjectId === 'all' 
                 ? projects 
                 : projects.filter(p => p.id === selectedProjectId);
-
-            if (!projectsToFetch || projectsToFetch.length === 0) {
-                setAggregatedData({ testCases: [], executions: [], defects: [] });
-                setIsLoading(false);
-                return;
-            }
 
             const allTestCases: TestCase[] = [];
             const allExecutions: TestExecutionRun[] = [];
@@ -139,14 +131,12 @@ export default function ExecutiveDashboardPage() {
 
         // --- Risk & Readiness ---
         let riskLevel = "Low";
-        if (openHighSeverityDefects > 5 || (testCases.length > 0 && qualityHealthScore < 70)) riskLevel = "Medium";
-        if (openHighSeverityDefects > 10 || (testCases.length > 0 && qualityHealthScore < 50)) riskLevel = "High";
-        if (testCases.length === 0) riskLevel = "N/A";
+        if (openHighSeverityDefects > 5 || qualityHealthScore < 70) riskLevel = "Medium";
+        if (openHighSeverityDefects > 10 || qualityHealthScore < 50) riskLevel = "High";
         
         let releaseReadiness = "Ready";
         if (riskLevel === "Medium") releaseReadiness = "At Risk";
         if (riskLevel === "High") releaseReadiness = "Blocked";
-        if (testCases.length === 0) releaseReadiness = "N/A";
 
         // --- Flaky Test Detection (Simplified) ---
         const testExecutionStats: { [key: string]: { passes: number, fails: number }} = {};
@@ -176,7 +166,7 @@ export default function ExecutiveDashboardPage() {
         });
 
         return {
-            qualityHealthScore: testCases.length > 0 ? qualityHealthScore : null,
+            qualityHealthScore,
             riskLevel,
             releaseReadiness,
             flakyTests: flakyTests.sort((a,b) => b.failureRate - a.failureRate).slice(0, 5),
@@ -240,8 +230,8 @@ export default function ExecutiveDashboardPage() {
                     </CardHeader>
                     <CardContent className="flex flex-col items-center">
                         <div className="flex items-baseline">
-                            <p className="text-7xl font-bold">{qualityHealthScore ?? 'N/A'}</p>
-                            {qualityHealthScore !== null && <span className="text-2xl text-muted-foreground">/100</span>}
+                            <p className="text-7xl font-bold">{qualityHealthScore ?? 0}</p>
+                            <span className="text-2xl text-muted-foreground">/100</span>
                         </div>
                          {/* This part needs historical data to be meaningful */}
                         <div className="mt-2 flex items-center text-muted-foreground font-semibold">
@@ -283,28 +273,22 @@ export default function ExecutiveDashboardPage() {
                         <CardDescription>Project quality health score trend for the last 6 releases (placeholder data).</CardDescription>
                     </CardHeader>
                     <CardContent>
-                    {qualityHealthScore === null ? (
-                        <div className="flex h-[250px] w-full items-center justify-center text-center">
-                            <p className="text-muted-foreground">No data to display.</p>
-                        </div>
-                    ) : (
-                        <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                            <RechartsBarChart accessibilityLayer data={healthScoreData}>
-                                <CartesianGrid vertical={false} />
-                                <XAxis
-                                dataKey="month"
-                                tickLine={false}
-                                tickMargin={10}
-                                axisLine={false}
-                                />
-                                <ChartTooltip
-                                cursor={false}
-                                content={<ChartTooltipContent indicator="dashed" />}
-                                />
-                                <Bar dataKey="score" fill="var(--color-score)" radius={4} />
-                            </RechartsBarChart>
-                        </ChartContainer>
-                    )}
+                    <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                        <RechartsBarChart accessibilityLayer data={healthScoreData}>
+                            <CartesianGrid vertical={false} />
+                            <XAxis
+                            dataKey="month"
+                            tickLine={false}
+                            tickMargin={10}
+                            axisLine={false}
+                            />
+                            <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent indicator="dashed" />}
+                            />
+                            <Bar dataKey="score" fill="var(--color-score)" radius={4} />
+                        </RechartsBarChart>
+                    </ChartContainer>
                     </CardContent>
                 </Card>
 

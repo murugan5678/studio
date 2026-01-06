@@ -59,21 +59,10 @@ export default function ProjectsPage() {
   const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
   useEffect(() => {
-    if (areProjectsLoading) {
-      setIsStatsLoading(true);
-      return;
-    }
-    if (!projects || !user || !firestore) {
+    if (areProjectsLoading || !projects || !user || !firestore) {
       setIsStatsLoading(false);
-      setProjectsWithStats([]);
       return;
     };
-
-    if (projects.length === 0) {
-        setIsStatsLoading(false);
-        setProjectsWithStats([]);
-        return;
-    }
 
     setIsStatsLoading(true);
     const fetchStatsForProjects = async () => {

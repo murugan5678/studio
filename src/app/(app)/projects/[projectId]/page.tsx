@@ -416,14 +416,7 @@ const projectStats = useMemo(() => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                           {areTestCasesLoading && (
-                            <TableRow>
-                                <TableCell colSpan={10} className="h-24 text-center">
-                                    Loading test cases...
-                                </TableCell>
-                            </TableRow>
-                           )}
-                           {!areTestCasesLoading && testCases && testCases.length > 0 ? (
+                           {testCases && testCases.length > 0 ? (
                                 testCases.map(tc => (
                                     <TableRow key={tc.id} data-state={selectedTestCases.includes(tc.id) && "selected"}>
                                         <TableCell>
@@ -467,13 +460,11 @@ const projectStats = useMemo(() => {
                                     </TableRow>
                                 ))
                            ) : (
-                            !areTestCasesLoading && (
-                                <TableRow>
-                                    <TableCell colSpan={10} className="h-24 text-center">
-                                        No test cases yet. Start by creating one.
-                                    </TableCell>
-                                </TableRow>
-                            )
+                            <TableRow>
+                                <TableCell colSpan={10} className="h-24 text-center">
+                                    No test cases yet. Start by creating one.
+                                </TableCell>
+                            </TableRow>
                            )}
                         </TableBody>
                     </Table>
