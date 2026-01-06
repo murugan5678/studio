@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDown, ArrowUp, BarChart, FileWarning, Gauge, Shield, Siren } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart, FileWarning, Gauge, Shield, ShieldAlert, Siren } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -17,30 +17,181 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, XAxis } from 'recharts';
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, getDocs, query } from "firebase/firestore";
+import type { Project, TestCase, TestExecutionRun, Defect } from "@/lib/types";
+import { useEffect, useMemo, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const chartConfig = {
   score: { label: 'Score', color: 'hsl(var(--chart-2))' },
 };
 
-const healthScoreData = [
-    { month: "Jan", score: 75 },
-    { month: "Feb", score: 78 },
-    { month: "Mar", score: 82 },
-    { month: "Apr", score: 80 },
-    { month: "May", score: 85 },
-    { month: "Jun", score: 68 },
-]
+interface AggregatedData {
+    testCases: TestCase[];
+    executions: TestExecutionRun[];
+    defects: Defect[];
+}
 
-const flakyTests = [
-    { id: "TC048", title: "User Profile - Avatar Upload", frequency: "15%", lastFailure: "Build #204" },
-    { id: "TC102", title: "Checkout - Apply Coupon Code", frequency: "12%", lastFailure: "Build #201" },
-    { id: "TC076", title: "Search - Filter by Date Range", frequency: "8%", lastFailure: "Build #205" },
-]
+interface FlakyTest extends TestCase {
+    failureRate: number;
+    passCount: number;
+    failCount: number;
+}
 
 export default function ExecutiveDashboardPage() {
-    const qualityHealthScore = 68;
-    const riskLevel = "High";
-    const releaseReadiness = "At Risk";
+    const { user } = useUser();
+    const firestore = useFirestore();
+    const [aggregatedData, setAggregatedData] = useState<AggregatedData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const projectsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/projects`);
+    }, [user, firestore]);
+
+    const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
+
+    useEffect(() => {
+        if (!projects || !user || !firestore) {
+            if(!areProjectsLoading) setIsLoading(false);
+            return;
+        }
+
+        const fetchData = async () => {
+            setIsLoading(true);
+            const allTestCases: TestCase[] = [];
+            const allExecutions: TestExecutionRun[] = [];
+            const allDefects: Defect[] = [];
+
+            for (const project of projects) {
+                const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`));
+                const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
+                const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
+
+                const [tcSnap, execSnap, defectSnap] = await Promise.all([
+                    getDocs(tcQuery),
+                    getDocs(execQuery),
+                    getDocs(defectQuery),
+                ]);
+
+                allTestCases.push(...tcSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
+                allExecutions.push(...execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun)));
+                allDefects.push(...defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect)));
+            }
+            setAggregatedData({ testCases: allTestCases, executions: allExecutions, defects: allDefects });
+            setIsLoading(false);
+        }
+        fetchData();
+    }, [projects, user, firestore, areProjectsLoading]);
+
+
+    const executiveMetrics = useMemo(() => {
+        if (!aggregatedData) return null;
+
+        const { testCases, executions, defects } = aggregatedData;
+
+        // 1. Critical Test Pass Rate
+        const criticalTestIds = new Set(testCases.filter(tc => tc.priority === 'Critical').map(tc => tc.id));
+        let criticalPassed = 0;
+        let criticalExecuted = 0;
+        executions.forEach(run => {
+            run.results.forEach(res => {
+                if (criticalTestIds.has(res.testCaseId)) {
+                    criticalExecuted++;
+                    if (res.status === 'Passed') criticalPassed++;
+                }
+            })
+        });
+        const criticalPassRate = criticalExecuted > 0 ? (criticalPassed / criticalExecuted) * 100 : 100;
+        
+        // 2. Open High-Severity Defects
+        const openHighSeverityDefects = defects.filter(d => d.status === 'Open' && (d.severity === 'High' || d.severity === 'Critical')).length;
+
+        // 3. Automation Coverage
+        const automatedTestCases = testCases.filter(tc => tc.automationFeasibility === 'Automatable').length;
+        const automationCoverage = testCases.length > 0 ? (automatedTestCases / testCases.length) * 100 : 0;
+        
+        // --- Quality Health Score Calculation (Simplified) ---
+        // Weights: Critical Pass Rate (50%), Open Defects (30%), Automation Coverage (20%)
+        let score = 0;
+        score += (criticalPassRate / 100) * 50;
+        // Defect penalty (more defects = lower score)
+        const defectPenalty = Math.min(openHighSeverityDefects * 5, 30);
+        score += (30 - defectPenalty);
+        score += (automationCoverage / 100) * 20;
+        const qualityHealthScore = Math.max(0, Math.min(100, Math.round(score)));
+
+        // --- Risk & Readiness ---
+        let riskLevel = "Low";
+        if (openHighSeverityDefects > 5 || qualityHealthScore < 70) riskLevel = "Medium";
+        if (openHighSeverityDefects > 10 || qualityHealthScore < 50) riskLevel = "High";
+        
+        let releaseReadiness = "Ready";
+        if (riskLevel === "Medium") releaseReadiness = "At Risk";
+        if (riskLevel === "High") releaseReadiness = "Blocked";
+
+        // --- Flaky Test Detection (Simplified) ---
+        const testExecutionStats: { [key: string]: { passes: number, fails: number }} = {};
+        executions.forEach(run => {
+            run.results.forEach(res => {
+                if (!testExecutionStats[res.testCaseId]) {
+                    testExecutionStats[res.testCaseId] = { passes: 0, fails: 0 };
+                }
+                if (res.status === 'Passed') testExecutionStats[res.testCaseId].passes++;
+                if (res.status === 'Failed') testExecutionStats[res.testCaseId].fails++;
+            })
+        });
+
+        const flakyTests: FlakyTest[] = [];
+        Object.entries(testExecutionStats).forEach(([testCaseId, stats]) => {
+            if (stats.passes > 0 && stats.fails > 0) {
+                const testCase = testCases.find(tc => tc.id === testCaseId);
+                if (testCase) {
+                    flakyTests.push({
+                        ...testCase,
+                        failureRate: (stats.fails / (stats.passes + stats.fails)) * 100,
+                        passCount: stats.passes,
+                        failCount: stats.fails,
+                    });
+                }
+            }
+        });
+
+        return {
+            qualityHealthScore,
+            riskLevel,
+            releaseReadiness,
+            flakyTests: flakyTests.sort((a,b) => b.failureRate - a.failureRate).slice(0, 5),
+        };
+
+    }, [aggregatedData]);
+
+    // Dummy data for chart until real historical data is implemented
+    const healthScoreData = [
+        { month: "Jan", score: 75 }, { month: "Feb", score: 78 }, { month: "Mar", score: 82 },
+        { month: "Apr", score: 80 }, { month: "May", score: 85 }, { month: "Jun", score: executiveMetrics?.qualityHealthScore ?? 0 },
+    ]
+
+    if (isLoading || !executiveMetrics) {
+        return (
+            <div className="space-y-6">
+                <Skeleton className="h-10 w-1/3" />
+                <Skeleton className="h-6 w-2/3" />
+                <div className="grid gap-6 md:grid-cols-3">
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                </div>
+                 <div className="grid gap-6 md:grid-cols-2">
+                    <Skeleton className="h-96 w-full" />
+                    <Skeleton className="h-96 w-full" />
+                </div>
+            </div>
+        )
+    }
+
+    const { qualityHealthScore, riskLevel, releaseReadiness, flakyTests } = executiveMetrics;
 
     return (
         <div className="space-y-6">
@@ -60,9 +211,10 @@ export default function ExecutiveDashboardPage() {
                             <p className="text-7xl font-bold">{qualityHealthScore}</p>
                             <span className="text-2xl text-muted-foreground">/100</span>
                         </div>
-                        <div className="mt-2 flex items-center text-red-600 font-semibold">
-                            <ArrowDown className="mr-1 h-4 w-4" />
-                            <span>14% from last release</span>
+                         {/* This part needs historical data to be meaningful */}
+                        <div className="mt-2 flex items-center text-muted-foreground font-semibold">
+                            <BarChart className="mr-1 h-4 w-4" />
+                            <span>Based on current data</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -70,24 +222,24 @@ export default function ExecutiveDashboardPage() {
                     <CardHeader>
                          <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Risk Level</CardTitle>
-                             <Siren className="h-6 w-6 text-destructive" />
+                             <Siren className={`h-6 w-6 ${riskLevel === 'High' ? 'text-destructive' : riskLevel === 'Medium' ? 'text-amber-500' : 'text-green-500'}`} />
                          </div>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-4xl font-bold text-destructive">{riskLevel}</p>
-                        <p className="text-xs text-muted-foreground mt-2">Based on open critical defects and high failure rates.</p>
+                        <p className={`text-4xl font-bold ${riskLevel === 'High' ? 'text-destructive' : riskLevel === 'Medium' ? 'text-amber-500' : 'text-green-500'}`}>{riskLevel}</p>
+                        <p className="text-xs text-muted-foreground mt-2">Based on open critical defects and health score.</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader>
                          <div className="flex items-center justify-between">
                             <CardTitle className="text-base">Release Readiness</CardTitle>
-                             <Shield className="h-6 w-6 text-amber-500" />
+                             <ShieldAlert className={`h-6 w-6 ${releaseReadiness === 'Blocked' ? 'text-destructive' : releaseReadiness === 'At Risk' ? 'text-amber-500' : 'text-green-500'}`} />
                          </div>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-4xl font-bold text-amber-500">{releaseReadiness}</p>
-                        <p className="text-xs text-muted-foreground mt-2">Critical tests must pass before release.</p>
+                        <p className={`text-4xl font-bold ${releaseReadiness === 'Blocked' ? 'text-destructive' : releaseReadiness === 'At Risk' ? 'text-amber-500' : 'text-green-500'}`}>{releaseReadiness}</p>
+                        <p className="text-xs text-muted-foreground mt-2">Based on current risk level.</p>
                     </CardContent>
                 </Card>
             </div>
@@ -96,7 +248,7 @@ export default function ExecutiveDashboardPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Health Score Over Time</CardTitle>
-                        <CardDescription>Project quality health score trend for the last 6 releases.</CardDescription>
+                        <CardDescription>Project quality health score trend for the last 6 releases (placeholder data).</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={chartConfig} className="h-[250px] w-full">
@@ -128,23 +280,29 @@ export default function ExecutiveDashboardPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Test Case</TableHead>
-                                    <TableHead>Frequency</TableHead>
-                                    <TableHead>Last Failure</TableHead>
+                                    <TableHead>Failure Rate</TableHead>
+                                    <TableHead>Run History</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {flakyTests.map(test => (
+                                {flakyTests.length > 0 ? flakyTests.map(test => (
                                     <TableRow key={test.id}>
                                         <TableCell>
                                             <div className="font-medium">{test.title}</div>
                                             <div className="text-sm text-muted-foreground">{test.id}</div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="destructive">{test.frequency}</Badge>
+                                            <Badge variant="destructive">{test.failureRate.toFixed(0)}%</Badge>
                                         </TableCell>
-                                        <TableCell>{test.lastFailure}</TableCell>
+                                        <TableCell>{test.passCount} Passed, {test.failCount} Failed</TableCell>
                                     </TableRow>
-                                ))}
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="h-24 text-center">
+                                            No flaky tests detected.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

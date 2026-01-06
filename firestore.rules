@@ -190,6 +190,28 @@ service cloud.firestore {
           allow update: if isExistingOwner(userId);
           allow delete: if isExistingOwner(userId);
         }
+
+        //---------------------------------------------------------------------
+        // Defects (/users/{userId}/projects/{projectId}/defects/{defectId})
+        //---------------------------------------------------------------------
+        match /defects/{defectId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
+
+        //---------------------------------------------------------------------
+        // Releases (/users/{userId}/projects/{projectId}/releases/{releaseId})
+        //---------------------------------------------------------------------
+        match /releases/{releaseId} {
+          allow get: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow create: if isOwner(userId);
+          allow update: if isExistingOwner(userId);
+          allow delete: if isExistingOwner(userId);
+        }
       }
     }
 
