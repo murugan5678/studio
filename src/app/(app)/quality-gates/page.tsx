@@ -3,12 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, getDocs } from 'firebase/firestore';
-import type { Project, TestCase, TestExecutionRun, Defect, DeploymentApproval, QualityGateConfig } from '@/lib/types';
+import type { Project, TestCase, TestExecutionRun, Defect, DeploymentApproval } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { Progress } from '@/components/ui/progress';
 
@@ -42,11 +41,14 @@ export default function QualityGatesPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading) {
-            setIsLoading(true);
+        if (!projects || !user || !firestore) {
+            if (!areProjectsLoading) {
+                setIsLoading(false);
+            }
             return;
         }
-        if (!projects || projects.length === 0 || !user || !firestore) {
+        
+        if (projects.length === 0) {
             setIsLoading(false);
             return;
         }
@@ -54,19 +56,16 @@ export default function QualityGatesPage() {
         const fetchProjectsData = async () => {
             setIsLoading(true);
             const enrichedData = await Promise.all(projects.map(async (project) => {
-                const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`));
                 const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
                 const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
                 const approvalQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/deploymentApproval`));
 
-                const [tcSnap, execSnap, defectSnap, approvalSnap] = await Promise.all([
-                    getDocs(tcQuery),
-                    getDocs(execSnap),
+                const [execSnap, defectSnap, approvalSnap] = await Promise.all([
+                    getDocs(execQuery),
                     getDocs(defectQuery),
                     getDocs(approvalQuery)
                 ]);
 
-                const testCases = tcSnap.docs.map(d => d.data() as TestCase);
                 const executions = execSnap.docs.map(d => d.data() as TestExecutionRun);
                 const defects = defectSnap.docs.map(d => d.data() as Defect);
                 const approvalDoc = approvalSnap.docs?.[0]?.data() as DeploymentApproval | undefined;
@@ -102,10 +101,11 @@ export default function QualityGatesPage() {
             setProjectsData(enrichedData);
             setIsLoading(false);
         };
+
         fetchProjectsData();
     }, [projects, user, firestore, areProjectsLoading]);
     
-    if (isLoading) {
+    if (isLoading && areProjectsLoading) {
         return (
             <Card>
                 <CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader>
