@@ -55,7 +55,7 @@ export default function DashboardPage() {
             allExecutions.forEach(run => {
                 run.results.forEach(result => {
                     const existing = latestResults.get(result.testCaseId);
-                    if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
+                    if (!existing || (run.createdAt && 'toMillis' in run.createdAt && existing.executionDate && 'toMillis' in existing.executionDate && run.createdAt.toMillis() > existing.executionDate.toMillis())) {
                         latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
                     }
                 });
