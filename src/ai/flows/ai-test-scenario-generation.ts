@@ -9,69 +9,56 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import {nanoid} from 'nanoid';
 
 const GenerateTestScenariosInputSchema = z.object({
-  inputData: z.string().describe("Screenshots, UI images, Figma links, BRD/PRD documents, or text descriptions as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'. Alternatively, can be plain text."),
+  inputData: z.string().describe("A data URI of a screenshot, UI image, or document (e.g., 'data:image/png;base64,...'). Alternatively, it can be a plain text description, a link to a Figma design, or the content of a BRD/PRD."),
 });
 export type GenerateTestScenariosInput = z.infer<typeof GenerateTestScenariosInputSchema>;
 
-const GenerateTestScenariosOutputSchema = z.object({
-  testCases: z.array(
-    z.object({
-      testCaseId: z.string().describe('The unique identifier for the test case.'),
-      testCaseTitle: z.string().describe('The title of the test case.'),
-      module: z.string().describe('The module or feature the test case belongs to.'),
-      subModule: z.string().describe('The sub-module the test case belongs to.'),
-      team: z.string().describe('The team responsible for the test case.'),
-      sprintRelease: z.string().describe('The sprint or release the test case is associated with.'),
-      priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe('The priority of the test case.'),
-      severity: z.string().describe('The severity of the potential defect.'),
-      preconditions: z.string().describe('The preconditions required to execute the test case.'),
-      testSteps: z.array(z.string()).describe('The step-by-step instructions for executing the test case.'),
-      testData: z.string().describe('The data required for the test case.'),
-      expectedResult: z.string().describe('The expected outcome of the test case.'),
-      type: z.enum(['Positive', 'Negative', 'Edge']).describe('The type of test case.'),
-      automationFeasibility: z.enum(['Manual', 'Automatable']).describe('Whether the test case can be automated.'),
-      automationPriority: z.string().describe('The priority for automating the test case.'),
-      tagsLabels: z.array(z.string()).describe('The tags or labels associated with the test case.'),
-      createdBy: z.string().describe('The user who created the test case.'),
-      createdDate: z.string().describe('The date the test case was created.'),
-    })
-  ).describe('The generated test cases.'),
+const TestCaseSchema = z.object({
+  testCaseId: z.string().describe('A unique identifier for the test case (e.g., "TC-001").'),
+  title: z.string().describe('A concise title for the test case.'),
+  module: z.string().describe('The primary module or feature the test case belongs to.'),
+  subModule: z.string().describe('The specific sub-module or component being tested.'),
+  team: z.string().describe('The team responsible for this test area (e.g., "Frontend", "Backend", "QA Core").'),
+  sprint: z.string().describe('The sprint or release cycle this test case is associated with (e.g., "Sprint 24.08", "v2.1 Release").'),
+  priority: z.enum(['Low', 'Medium', 'High', 'Critical']).describe('The execution priority of the test case.'),
+  severity: z.string().describe('The severity of the potential defect if this test fails (e.g., "Minor", "Major", "Critical").'),
+  preconditions: z.string().describe('The conditions that must be met before executing the test case.'),
+  testSteps: z.array(z.string()).describe('The step-by-step instructions for executing the test.'),
+  testData: z.string().describe('The specific data to be used for the test (e.g., user credentials, search queries).'),
+  expectedResult: z.string().describe('The expected outcome after executing the test steps.'),
+  type: z.enum(['Positive', 'Negative', 'Edge']).describe('The nature of the test case (e.g., testing valid inputs, invalid inputs, or boundary conditions).'),
+  automationFeasibility: z.enum(['Manual', 'Automatable']).describe('Whether the test case is a good candidate for automation.'),
+  automationPriority: z.string().describe('The priority for automating this test case (e.g., "P0", "P1", "P2").'),
+  tags: z.array(z.string()).describe('Relevant tags or labels for grouping and filtering (e.g., "smoke", "regression", "login").'),
+});
+
+export const GenerateTestScenariosOutputSchema = z.object({
+  testCases: z.array(TestCaseSchema).describe('The array of generated test cases.'),
 });
 export type GenerateTestScenariosOutput = z.infer<typeof GenerateTestScenariosOutputSchema>;
 
 export async function generateTestScenarios(input: GenerateTestScenariosInput): Promise<GenerateTestScenariosOutput> {
-  return generateTestScenariosFlow(input);
+  const result = await generateTestScenariosFlow(input);
+  // Post-process to add unique IDs if the model didn't, using nanoid for brevity
+  const processedCases = result.testCases.map(tc => ({
+    ...tc,
+    testCaseId: tc.testCaseId || `tc_${nanoid(6)}`,
+  }));
+  return { testCases: processedCases };
 }
 
 const prompt = ai.definePrompt({
   name: 'generateTestScenariosPrompt',
   input: {schema: GenerateTestScenariosInputSchema},
   output: {schema: GenerateTestScenariosOutputSchema},
-  prompt: `You are an expert QA engineer specializing in generating test scenarios from various inputs.
+  prompt: `You are a world-class Senior QA Engineer tasked with creating a comprehensive suite of test cases based on provided materials. Your goal is to be thorough, precise, and to structure your output perfectly according to the specified JSON schema.
 
-You will analyze the input data (screenshots, UI images, Figma links, BRD/PRD documents, or text descriptions) and generate structured test cases.
+Analyze the provided input, which could be a screenshot, a design link, a document, or a simple text description of a feature. From this, generate a diverse set of test cases covering positive paths, negative paths, and edge cases.
 
-Each test case should include the following fields:
-- testCaseId: A unique identifier for the test case.
-- testCaseTitle: A concise title for the test case.
-- module: The module or feature the test case belongs to.
-- subModule: The sub-module the test case belongs to.
-- team: The team responsible for the test case.
-- sprintRelease: The sprint or release the test case is associated with.
-- priority: The priority of the test case (Low, Medium, High, Critical).
-- severity: The severity of the potential defect.
-- preconditions: The preconditions required to execute the test case.
-- testSteps: Step-by-step instructions for executing the test case.
-- testData: The data required for the test case.
-- expectedResult: The expected outcome of the test case.
-- type: The type of test case (Positive, Negative, Edge).
-- automationFeasibility: Whether the test case can be automated (Manual, Automatable).
-- automationPriority: The priority for automating the test case.
-- tagsLabels: Tags or labels associated with the test case.
-- createdBy: The user who created the test case.
-- createdDate: The date the test case was created.
+For each test case, meticulously fill out all fields in the required structure. Pay close attention to creating meaningful titles, clear preconditions, and granular, easy-to-follow test steps.
 
 Analyze the following input and generate the test cases:
 
