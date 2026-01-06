@@ -113,20 +113,14 @@ export default function ProjectDetailsPage() {
   
 const projectStats = useMemo(() => {
     const statusCounts: { [key: string]: number } = { Passed: 0, Failed: 0, Blocked: 0, Deferred: 0, "Can't Test": 0, NotRun: 0 };
-    const latestResults = new Map<string, TestExecutionResult>();
+    const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
 
     // Determine the latest result for each test case
     (executionRuns || []).forEach(run => {
         run.results.forEach(result => {
             const existing = latestResults.get(result.testCaseId);
-            const runDate = (run.createdAt as Timestamp)?.toMillis();
-            // This is a simplified check. A more robust solution would be to store execution date per result.
-            // For now, we assume all results in a run have the same timestamp.
-            const existingRun = executionRuns?.find(r => r.results.some(res => res.testCaseId === result.testCaseId));
-            const existingDate = existingRun ? (existingRun.createdAt as Timestamp)?.toMillis() : 0;
-
-            if (!existing || runDate > existingDate) {
-                latestResults.set(result.testCaseId, result);
+            if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
+                latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
             }
         });
     });
