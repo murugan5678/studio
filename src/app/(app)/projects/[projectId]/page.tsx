@@ -164,7 +164,7 @@ export default function ProjectDetailsPage() {
     const passed = run.results.filter(r => r.status === 'Passed').length;
     const failed = run.results.filter(r => r.status === 'Failed').length;
     const total = run.results.length;
-    const hasBugs = run.results.some(r => r.bugLink);
+    const hasBugs = run.results.some(r => r.bugLink && r.bugLink.trim() !== '');
     return { passed, failed, total, hasBugs };
   };
 
