@@ -47,6 +47,7 @@ const chartConfig = {
     blocked: { label: 'Blocked', color: 'hsl(var(--chart-3))' },
     deferred: { label: 'Deferred', color: 'hsl(var(--chart-4))' },
     "Can't Test": { label: "Can't Test", color: 'hsl(var(--chart-5))' },
+    notRun: { label: 'Not Run', color: 'hsl(var(--muted))' }
 };
 
 const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -197,6 +198,7 @@ const projectStats = useMemo(() => {
     const monthlyData: { [key: string]: { passed: number; failed: number; blocked: number; deferred: number; "Can't Test": number; } } = {};
     
     (executionRuns || []).forEach(run => {
+        if (!run.createdAt) return;
         const date = run.createdAt.toDate();
         const month = date.toLocaleString('default', { month: 'short' });
         
@@ -205,23 +207,11 @@ const projectStats = useMemo(() => {
         }
 
         run.results.forEach(result => {
-            switch(result.status) {
-                case 'Passed':
-                    monthlyData[month].passed++;
-                    break;
-                case 'Failed':
-                    monthlyData[month].failed++;
-                    break;
-                case 'Blocked':
-                    monthlyData[month].blocked++;
-                    break;
-                case 'Deferred':
-                    monthlyData[month].deferred++;
-                    break;
-                case "Can't Test":
-                    monthlyData[month]["Can't Test"]++;
-                    break;
-            }
+            if (result.status === 'Passed') monthlyData[month].passed++;
+            else if (result.status === 'Failed') monthlyData[month].failed++;
+            else if (result.status === 'Blocked') monthlyData[month].blocked++;
+            else if (result.status === 'Deferred') monthlyData[month].deferred++;
+            else if (result.status === "Can't Test") monthlyData[month]["Can't Test"]++;
         })
     });
 
