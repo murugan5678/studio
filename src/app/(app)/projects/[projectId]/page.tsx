@@ -46,7 +46,7 @@ const chartConfig = {
     failed: { label: 'Failed', color: 'hsl(var(--chart-1))' },
     blocked: { label: 'Blocked', color: 'hsl(var(--chart-3))' },
     deferred: { label: 'Deferred', color: 'hsl(var(--chart-4))' },
-    "Can't Test": { label: 'Can\'t Test', color: 'hsl(var(--chart-5))' },
+    "Can't Test": { label: "Can't Test", color: 'hsl(var(--chart-5))' },
 };
 
 const priorityVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -111,23 +111,27 @@ export default function ProjectDetailsPage() {
     document.body.removeChild(link);
   };
   
-  const projectStats = useMemo(() => {
+const projectStats = useMemo(() => {
     const statusCounts: { [key: string]: number } = { Passed: 0, Failed: 0, Blocked: 0, Deferred: 0, "Can't Test": 0, NotRun: 0 };
-    const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
+    const latestResults = new Map<string, TestExecutionResult>();
 
     // Determine the latest result for each test case
     (executionRuns || []).forEach(run => {
         run.results.forEach(result => {
             const existing = latestResults.get(result.testCaseId);
-            if (!existing || run.createdAt.toMillis() > existing.executionDate.toMillis()) {
-                latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
+            const runDate = (run.createdAt as Timestamp)?.toMillis();
+            // This is a simplified check. A more robust solution would be to store execution date per result.
+            // For now, we assume all results in a run have the same timestamp.
+            const existingRun = executionRuns?.find(r => r.results.some(res => res.testCaseId === result.testCaseId));
+            const existingDate = existingRun ? (existingRun.createdAt as Timestamp)?.toMillis() : 0;
+
+            if (!existing || runDate > existingDate) {
+                latestResults.set(result.testCaseId, result);
             }
         });
     });
 
     const approvedTestCases = testCases || [];
-    const totalTestCases = approvedTestCases.length;
-
     approvedTestCases.forEach(tc => {
         const latestResult = latestResults.get(tc.id);
         if (latestResult) {
@@ -139,6 +143,7 @@ export default function ProjectDetailsPage() {
         }
     });
 
+    const totalTestCases = approvedTestCases.length;
     const executedCount = totalTestCases - statusCounts.NotRun;
     const completion = totalTestCases > 0 ? Math.round((executedCount / totalTestCases) * 100) : 0;
 
@@ -194,9 +199,9 @@ export default function ProjectDetailsPage() {
   ];
 
   const chartData = useMemo(() => {
-    const monthlyData: {[key: string]: {passed: number, failed: number, blocked: number, deferred: number, "Can't Test": number}} = {};
+    const monthlyData: { [key: string]: { passed: number; failed: number; blocked: number; deferred: number; "Can't Test": number; } } = {};
     
-    executionRuns?.forEach(run => {
+    (executionRuns || []).forEach(run => {
         const date = run.createdAt.toDate();
         const month = date.toLocaleString('default', { month: 'short' });
         
@@ -205,8 +210,22 @@ export default function ProjectDetailsPage() {
         }
 
         run.results.forEach(result => {
-            if(monthlyData[month].hasOwnProperty(result.status)) {
-                monthlyData[month][result.status as keyof typeof monthlyData[string]]++;
+            switch(result.status) {
+                case 'Passed':
+                    monthlyData[month].passed++;
+                    break;
+                case 'Failed':
+                    monthlyData[month].failed++;
+                    break;
+                case 'Blocked':
+                    monthlyData[month].blocked++;
+                    break;
+                case 'Deferred':
+                    monthlyData[month].deferred++;
+                    break;
+                case "Can't Test":
+                    monthlyData[month]["Can't Test"]++;
+                    break;
             }
         })
     });
