@@ -101,17 +101,27 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
   }, [testCase, form]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!testCaseRef) {
+    if (!testCaseRef || !testCase) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Database not available. Please try again.',
+        description: 'Test case data not found or database not available. Please try again.',
       });
       return;
     }
 
     const testCaseData = {
+      // Preserve original data that should not be changed on edit
+      id: testCase.id,
+      projectId: testCase.projectId,
+      createdBy: testCase.createdBy,
+      createdAt: testCase.createdAt,
+      status: testCase.status,
+
+      // Apply updated values from the form
       ...values,
+      
+      // Process specific fields
       tags: values.tags?.split(',').map(tag => tag.trim()).filter(Boolean) || [],
       updatedAt: serverTimestamp(),
     };
@@ -415,6 +425,3 @@ export default function EditTestCasePage({ params }: { params: { projectId: stri
     </Card>
   );
 }
-
-    
-    
