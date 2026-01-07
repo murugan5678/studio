@@ -63,7 +63,7 @@ export default function ExecutiveDashboardPage() {
 
         const fetchData = async () => {
             setIsLoading(true);
-            setAggregatedData(null); // Clear previous data
+            setAggregatedData(null);
 
             const projectsToFetch = selectedProjectId === 'all' 
                 ? projects
@@ -125,11 +125,8 @@ export default function ExecutiveDashboardPage() {
         let criticalPassed = 0;
         criticalTestCases.forEach(tc => {
             const latestResult = latestResults.get(tc.id);
-            if (!latestResult) {
-                // If a critical test has never run, it hasn't passed.
-                return;
-            }
-            if (latestResult.status === 'Passed') {
+            // Only count as passed if it has run and the latest status is 'Passed'.
+            if (latestResult && latestResult.status === 'Passed') {
                 criticalPassed++;
             }
         });
@@ -348,7 +345,7 @@ export default function ExecutiveDashboardPage() {
                                 )) : (
                                     <TableRow>
                                         <TableCell colSpan={3} className="h-24 text-center">
-                                            No flaky tests detected.
+                                            No flaky tests detected for this project.
                                         </TableCell>
                                     </TableRow>
                                 )}
