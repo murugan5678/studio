@@ -18,11 +18,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCollection, useUser, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
-import { PlusCircle } from 'lucide-react';
+import { collection, serverTimestamp, getDocs, query, where, doc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { PlusCircle, MoreVertical, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
@@ -31,6 +42,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+
 
 interface ProjectWithStats extends Project {
   stats: {
@@ -44,6 +63,7 @@ interface ProjectWithStats extends Project {
 export default function ProjectsPage() {
   const { user } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -60,7 +80,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     if (areProjectsLoading || !projects || !user || !firestore) {
-      setIsStatsLoading(false);
+      if(!areProjectsLoading) setIsStatsLoading(false);
       return;
     };
 
@@ -141,6 +161,25 @@ export default function ProjectsPage() {
     setIsDialogOpen(false);
   };
   
+  const handleDeleteProject = async (projectId: string) => {
+    if (!user || !firestore) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Authentication required.' });
+        return;
+    }
+    
+    // NOTE: This is a simplified client-side deletion. It does not handle sub-collections.
+    // For a production app, a Cloud Function would be required to recursively delete all
+    // sub-collections (test cases, executions, etc.) to prevent orphaned data.
+    try {
+        const projectRef = doc(firestore, `users/${user.uid}/projects`, projectId);
+        await deleteDoc(projectRef);
+        toast({ title: 'Project Deleted', description: 'The project has been permanently deleted.' });
+    } catch (error) {
+        console.error("Error deleting project: ", error);
+        toast({ variant: 'destructive', title: 'Deletion Failed', description: 'There was an error deleting the project.' });
+    }
+  };
+
   const isLoading = areProjectsLoading || isStatsLoading;
 
   return (
@@ -219,21 +258,55 @@ export default function ProjectsPage() {
             return (
               <Card key={project.id} className="flex flex-col hover:shadow-lg transition-shadow duration-300">
                 <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <Link href={`/projects/${project.id}`} className="hover:underline">
+                  <CardTitle className="flex items-start justify-between">
+                    <Link href={`/projects/${project.id}`} className="hover:underline pr-2">
                       {project.name}
                     </Link>
-                    <Badge variant={stats.variant}>{stats.status}</Badge>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className='h-6 w-6 shrink-0'>
+                                <MoreVertical className="h-4 w-4" />
+                                <span className='sr-only'>More options</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='end'>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className='text-destructive'>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Project
+                                    </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete the <strong>{project.name}</strong> project and all of its associated data.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteProject(project.id)}>
+                                            Continue
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </DropdownMenuContent>
+                     </DropdownMenu>
                   </CardTitle>
-                  <CardDescription className="line-clamp-2 h-[40px]">{project.description}</CardDescription>
+                  <CardDescription className="line-clamp-2 h-[40px] pt-1">{project.description}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
                     <div className="text-sm text-muted-foreground">
                         <span className="font-bold text-foreground">{stats.totalTestCases}</span> Test Cases
                     </div>
                     <div className="mt-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                             <Badge variant={stats.variant} className='mb-1'>{stats.status}</Badge>
+                             <span>{stats.completion}%</span>
+                        </div>
                         <Progress value={stats.completion} aria-label={`${stats.completion}% complete`} />
-                        <p className="text-xs text-muted-foreground mt-1">{stats.completion}% complete</p>
                     </div>
                 </CardContent>
                 <CardFooter>
