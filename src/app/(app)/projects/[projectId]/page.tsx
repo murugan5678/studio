@@ -504,7 +504,7 @@ const projectStats = useMemo(() => {
                             return (
                                 <TableRow key={run.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/projects/${params.projectId}/executions/${run.id}`)}>
                                     <TableCell className="font-medium">{run.title}</TableCell>
-                                    <TableCell>{run.createdAt.toDate().toLocaleDateString()}</TableCell>
+                                    <TableCell>{run.createdAt ? run.createdAt.toDate().toLocaleDateString() : 'Pending...'}</TableCell>
                                     <TableCell>
                                         {stats.passed} Passed, {stats.failed} Failed ({stats.total} total)
                                     </TableCell>
