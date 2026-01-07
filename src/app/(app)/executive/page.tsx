@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowDown, ArrowUp, BarChart, FileWarning, Gauge, Shield, ShieldAlert, Siren } from "lucide-react";
+import { BarChart, Gauge, Siren, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -18,8 +18,8 @@ import {
 } from '@/components/ui/chart';
 import { Bar, BarChart as RechartsBarChart, CartesianGrid, XAxis } from 'recharts';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import type { Project, TestCase, TestExecutionRun, Defect } from "@/lib/types";
+import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import type { Project, TestCase, TestExecutionRun, Defect, TestExecutionResult } from "@/lib/types";
 import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,7 +56,9 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading || !projects || !user || !firestore) {
+        if (areProjectsLoading) return;
+        if (!projects || !user || !firestore) {
+            setIsLoading(false);
             return;
         }
 
@@ -81,7 +83,7 @@ export default function ExecutiveDashboardPage() {
                 for (const project of projectsToFetch) {
                     const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
                     const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
-                    const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`));
+                    const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`), where('status', '==', 'Open'));
     
                     const [tcSnap, execSnap, defectSnap] = await Promise.all([
                         getDocs(tcQuery),
@@ -110,32 +112,39 @@ export default function ExecutiveDashboardPage() {
 
         const { testCases, executions, defects } = aggregatedData;
 
-        // 1. Critical Test Pass Rate
-        const criticalTestIds = new Set(testCases.filter(tc => tc.priority === 'Critical').map(tc => tc.id));
-        let criticalPassed = 0;
-        let criticalExecuted = 0;
+        // --- Correctly determine the latest result for each test case ---
+        const latestResults = new Map<string, TestExecutionResult & { executionDate: Timestamp }>();
         executions.forEach(run => {
-            run.results.forEach(res => {
-                if (criticalTestIds.has(res.testCaseId)) {
-                    criticalExecuted++;
-                    if (res.status === 'Passed') criticalPassed++;
+            if (!run.createdAt || typeof run.createdAt.toMillis !== 'function') return;
+            run.results.forEach(result => {
+                const existing = latestResults.get(result.testCaseId);
+                if (!existing || (run.createdAt.toMillis() > existing.executionDate.toMillis())) {
+                    latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
                 }
-            })
+            });
         });
-        const criticalPassRate = criticalExecuted > 0 ? (criticalPassed / criticalExecuted) * 100 : 100;
+
+        // 1. Critical Test Pass Rate
+        const criticalTestCases = testCases.filter(tc => tc.priority === 'Critical');
+        let criticalPassed = 0;
+        criticalTestCases.forEach(tc => {
+            const latestResult = latestResults.get(tc.id);
+            if (latestResult?.status === 'Passed') {
+                criticalPassed++;
+            }
+        });
+        const criticalPassRate = criticalTestCases.length > 0 ? (criticalPassed / criticalTestCases.length) * 100 : 100;
         
-        // 2. Open High-Severity Defects
-        const openHighSeverityDefects = defects.filter(d => d.status === 'Open' && (d.severity === 'High' || d.severity === 'Critical')).length;
+        // 2. Open High-Severity Defects (Defects are pre-filtered by 'Open' status in query)
+        const openHighSeverityDefects = defects.filter(d => d.severity === 'High' || d.severity === 'Critical').length;
 
         // 3. Automation Coverage
         const automatedTestCases = testCases.filter(tc => tc.automationFeasibility === 'Automatable').length;
         const automationCoverage = testCases.length > 0 ? (automatedTestCases / testCases.length) * 100 : 0;
         
-        // --- Quality Health Score Calculation (Simplified) ---
-        // Weights: Critical Pass Rate (50%), Open Defects (30%), Automation Coverage (20%)
+        // --- Quality Health Score Calculation ---
         let score = 0;
         score += (criticalPassRate / 100) * 50;
-        // Defect penalty (more defects = lower score)
         const defectPenalty = Math.min(openHighSeverityDefects * 5, 30);
         score += (30 - defectPenalty);
         score += (automationCoverage / 100) * 20;
@@ -150,7 +159,7 @@ export default function ExecutiveDashboardPage() {
         if (riskLevel === "Medium") releaseReadiness = "At Risk";
         if (riskLevel === "High") releaseReadiness = "Blocked";
 
-        // --- Flaky Test Detection (Simplified) ---
+        // --- Flaky Test Detection ---
         const testExecutionStats: { [key: string]: { passes: number, fails: number }} = {};
         executions.forEach(run => {
             if (!run.results) return;
@@ -252,7 +261,6 @@ export default function ExecutiveDashboardPage() {
                             <p className="text-7xl font-bold">{qualityHealthScore ?? 0}</p>
                             <span className="text-2xl text-muted-foreground">/100</span>
                         </div>
-                         {/* This part needs historical data to be meaningful */}
                         <div className="mt-2 flex items-center text-muted-foreground font-semibold">
                             <BarChart className="mr-1 h-4 w-4" />
                             <span>Based on current data</span>
@@ -352,5 +360,3 @@ export default function ExecutiveDashboardPage() {
         </div>
     );
 }
-
-    
