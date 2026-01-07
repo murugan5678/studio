@@ -56,17 +56,13 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading) {
-            setIsLoading(true);
-            return;
-        }
-        if (!projects || !user || !firestore) {
-             setIsLoading(false);
+        if (areProjectsLoading || !projects || !user || !firestore) {
             return;
         }
 
         const fetchData = async () => {
             setIsLoading(true);
+            
             const projectsToFetch = selectedProjectId === 'all' 
                 ? projects
                 : projects.filter(p => p.id === selectedProjectId);
@@ -197,7 +193,10 @@ export default function ExecutiveDashboardPage() {
         { month: "Apr", score: 0 }, { month: "May", score: 0 }, { month: "Jun", score: executiveMetrics?.qualityHealthScore ?? 0 },
     ]
 
-    if (isLoading || areProjectsLoading) {
+    const effectiveIsLoading = isLoading || areProjectsLoading;
+    const { qualityHealthScore, riskLevel, releaseReadiness, flakyTests } = executiveMetrics || {};
+
+    if (effectiveIsLoading) {
         return (
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -219,8 +218,6 @@ export default function ExecutiveDashboardPage() {
             </div>
         )
     }
-
-    const { qualityHealthScore, riskLevel, releaseReadiness, flakyTests } = executiveMetrics || {};
 
     return (
         <div className="space-y-6">
@@ -355,3 +352,5 @@ export default function ExecutiveDashboardPage() {
         </div>
     );
 }
+
+    
