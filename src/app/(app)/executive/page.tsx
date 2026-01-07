@@ -60,7 +60,7 @@ export default function ExecutiveDashboardPage() {
             setIsLoading(true);
             return;
         }
-        if (projects === undefined || !user || !firestore) {
+        if (!projects || !user || !firestore) {
              setIsLoading(false);
             return;
         }
@@ -68,15 +68,15 @@ export default function ExecutiveDashboardPage() {
         const fetchData = async () => {
             setIsLoading(true);
             const projectsToFetch = selectedProjectId === 'all' 
-                ? projects || []
-                : (projects || []).filter(p => p.id === selectedProjectId);
+                ? projects
+                : projects.filter(p => p.id === selectedProjectId);
 
-            if (projectsToFetch.length === 0) {
+            if (projectsToFetch.length === 0 && selectedProjectId !== 'all') {
                 setAggregatedData({ testCases: [], executions: [], defects: [] });
                 setIsLoading(false);
                 return;
             }
-
+            
             const allTestCases: TestCase[] = [];
             const allExecutions: TestExecutionRun[] = [];
             const allDefects: Defect[] = [];
@@ -157,6 +157,7 @@ export default function ExecutiveDashboardPage() {
         // --- Flaky Test Detection (Simplified) ---
         const testExecutionStats: { [key: string]: { passes: number, fails: number }} = {};
         executions.forEach(run => {
+            if (!run.results) return;
             run.results.forEach(res => {
                 if (!testExecutionStats[res.testCaseId]) {
                     testExecutionStats[res.testCaseId] = { passes: 0, fails: 0 };
@@ -199,8 +200,13 @@ export default function ExecutiveDashboardPage() {
     if (isLoading || areProjectsLoading) {
         return (
             <div className="space-y-6">
-                <Skeleton className="h-10 w-1/3" />
-                <Skeleton className="h-6 w-2/3" />
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Skeleton className="h-10 w-64" />
+                        <Skeleton className="h-6 w-96 mt-2" />
+                    </div>
+                     <Skeleton className="h-10 w-64" />
+                </div>
                 <div className="grid gap-6 md:grid-cols-3">
                     <Skeleton className="h-48 w-full" />
                     <Skeleton className="h-48 w-full" />
