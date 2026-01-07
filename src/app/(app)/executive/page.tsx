@@ -56,15 +56,15 @@ export default function ExecutiveDashboardPage() {
     const { data: projects, isLoading: areProjectsLoading } = useCollection<Project>(projectsQuery);
 
     useEffect(() => {
-        if (areProjectsLoading) return;
-        if (!projects || !user || !firestore) {
-            setIsLoading(false);
+        if (areProjectsLoading || !projects || !user || !firestore) {
+            if (!areProjectsLoading) setIsLoading(false);
             return;
         }
 
         const fetchData = async () => {
             setIsLoading(true);
-            
+            setAggregatedData(null); // Clear previous data
+
             const projectsToFetch = selectedProjectId === 'all' 
                 ? projects
                 : projects.filter(p => p.id === selectedProjectId);
@@ -75,27 +75,23 @@ export default function ExecutiveDashboardPage() {
                 return;
             }
             
-            const allTestCases: TestCase[] = [];
-            const allExecutions: TestExecutionRun[] = [];
-            const allDefects: Defect[] = [];
-
             try {
-                for (const project of projectsToFetch) {
-                    const tcQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testCases`), where('status', '==', 'Approved'));
-                    const execQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/testExecutions`));
-                    const defectQuery = query(collection(firestore, `users/${user.uid}/projects/${project.id}/defects`), where('status', '==', 'Open'));
-    
-                    const [tcSnap, execSnap, defectSnap] = await Promise.all([
-                        getDocs(tcQuery),
-                        getDocs(execQuery),
-                        getDocs(defectQuery),
-                    ]);
-    
-                    allTestCases.push(...tcSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
-                    allExecutions.push(...execSnap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun)));
-                    allDefects.push(...defectSnap.docs.map(d => ({ id: d.id, ...d.data() } as Defect)));
-                }
+                const allTestCasesPromises = projectsToFetch.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testCases`), where('status', '==', 'Approved'))));
+                const allExecutionsPromises = projectsToFetch.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/testExecutions`))));
+                const allDefectsPromises = projectsToFetch.map(p => getDocs(query(collection(firestore, `users/${user.uid}/projects/${p.id}/defects`), where('status', '==', 'Open'))));
+
+                const [testCasesSnaps, executionsSnaps, defectsSnaps] = await Promise.all([
+                    Promise.all(allTestCasesPromises),
+                    Promise.all(allExecutionsPromises),
+                    Promise.all(allDefectsPromises),
+                ]);
+
+                const allTestCases = testCasesSnaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as TestCase)));
+                const allExecutions = executionsSnaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as TestExecutionRun)));
+                const allDefects = defectsSnaps.flatMap(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Defect)));
+                
                 setAggregatedData({ testCases: allTestCases, executions: allExecutions, defects: allDefects });
+
             } catch (error) {
                 console.error("Failed to fetch executive data:", error);
                 setAggregatedData({ testCases: [], executions: [], defects: [] });
@@ -118,7 +114,7 @@ export default function ExecutiveDashboardPage() {
             if (!run.createdAt || typeof run.createdAt.toMillis !== 'function') return;
             run.results.forEach(result => {
                 const existing = latestResults.get(result.testCaseId);
-                if (!existing || (run.createdAt.toMillis() > existing.executionDate.toMillis())) {
+                if (!existing || (run.createdAt.toMillis() > (existing.executionDate?.toMillis() ?? 0))) {
                     latestResults.set(result.testCaseId, { ...result, executionDate: run.createdAt });
                 }
             });
@@ -129,7 +125,11 @@ export default function ExecutiveDashboardPage() {
         let criticalPassed = 0;
         criticalTestCases.forEach(tc => {
             const latestResult = latestResults.get(tc.id);
-            if (latestResult?.status === 'Passed') {
+            if (!latestResult) {
+                // If a critical test has never run, it hasn't passed.
+                return;
+            }
+            if (latestResult.status === 'Passed') {
                 criticalPassed++;
             }
         });
@@ -139,21 +139,21 @@ export default function ExecutiveDashboardPage() {
         const openHighSeverityDefects = defects.filter(d => d.severity === 'High' || d.severity === 'Critical').length;
 
         // 3. Automation Coverage
-        const automatedTestCases = testCases.filter(tc => tc.automationFeasibility === 'Automatable').length;
-        const automationCoverage = testCases.length > 0 ? (automatedTestCases / testCases.length) * 100 : 0;
+        const automatableTestCases = testCases.filter(tc => tc.automationFeasibility === 'Automatable').length;
+        const automationCoverage = testCases.length > 0 ? (automatableTestCases / testCases.length) * 100 : 0;
         
         // --- Quality Health Score Calculation ---
         let score = 0;
-        score += (criticalPassRate / 100) * 50;
-        const defectPenalty = Math.min(openHighSeverityDefects * 5, 30);
-        score += (30 - defectPenalty);
-        score += (automationCoverage / 100) * 20;
+        score += (criticalPassRate / 100) * 50; // 50% weight for critical pass rate
+        const defectPenalty = Math.min(openHighSeverityDefects * 5, 30); // 5 points per defect, max 30 points penalty
+        score += (30 - defectPenalty); // 30% weight for defects
+        score += (automationCoverage / 100) * 20; // 20% weight for automation coverage
         const qualityHealthScore = Math.max(0, Math.min(100, Math.round(score)));
 
         // --- Risk & Readiness ---
         let riskLevel = "Low";
         if (openHighSeverityDefects > 5 || qualityHealthScore < 70) riskLevel = "Medium";
-        if (openHighSeverityDefects > 10 || qualityHealthScore < 50) riskLevel = "High";
+        if (openHighSeverityDefects > 10 || qualityHealthScore < 50 || criticalPassRate < 90) riskLevel = "High";
         
         let releaseReadiness = "Ready";
         if (riskLevel === "Medium") releaseReadiness = "At Risk";
@@ -360,3 +360,5 @@ export default function ExecutiveDashboardPage() {
         </div>
     );
 }
+
+    
