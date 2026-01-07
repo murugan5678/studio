@@ -196,35 +196,43 @@ const projectStats = useMemo(() => {
   ];
 
   const chartData = useMemo(() => {
-    const monthlyData: { [key: string]: { [status: string]: number } } = {};
+    // 1. Define the last 6 months
+    const months = Array.from({length: 6}, (_, i) => {
+        const d = new Date();
+        d.setDate(1); // Avoid issues with end of month
+        d.setMonth(d.getMonth() - i);
+        return {
+            date: d.toLocaleString('default', { month: 'short' }),
+            year: d.getFullYear(),
+            month: d.getMonth(),
+            passed: 0, failed: 0, blocked: 0, deferred: 0, "Can't Test": 0
+        };
+    }).reverse();
     
+    // 2. Create a map for quick lookup
+    const monthlyDataMap = new Map(months.map(m => [`${m.year}-${m.month}`, m]));
+
+    // 3. Process execution runs
     (executionRuns || []).forEach(run => {
         if (!run.createdAt || typeof run.createdAt.toDate !== 'function') return;
         const date = run.createdAt.toDate();
-        const month = date.toLocaleString('default', { month: 'short' });
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const key = `${year}-${month}`;
         
-        if(!monthlyData[month]) {
-            monthlyData[month] = { passed: 0, failed: 0, blocked: 0, deferred: 0, "Can't Test": 0 };
+        const monthData = monthlyDataMap.get(key);
+        if(monthData) {
+            run.results.forEach(result => {
+                if (monthData.hasOwnProperty(result.status.toLowerCase())) {
+                    (monthData as any)[result.status.toLowerCase()]++;
+                } else if (result.status === "Can't Test") {
+                    monthData["Can't Test"]++;
+                }
+            });
         }
-
-        run.results.forEach(result => {
-            if (monthlyData[month].hasOwnProperty(result.status)) {
-                monthlyData[month][result.status]++;
-            }
-        });
     });
 
-    const months = Array.from({length: 6}, (_, i) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - i);
-        return d.toLocaleString('default', { month: 'short' });
-    }).reverse();
-
-    return months.map(month => ({
-        date: month,
-        ...monthlyData[month]
-    }));
-
+    return Array.from(monthlyDataMap.values());
   }, [executionRuns]);
 
 
